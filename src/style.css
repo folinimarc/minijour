@@ -44,6 +44,9 @@ dialog::backdrop { background: #30382d35; backdrop-filter: blur(3px); }
 .settings-section p { color: var(--muted); font-size: 13px; line-height: 1.75; margin: 8px 0 16px; }
 .settings-section .help { font-size: 11px; line-height: 1.7; margin: 10px 0 16px; }
 .help code { font-size: 10px; overflow-wrap: anywhere; }
+#dropbox-developer-setup { margin: 16px 0; }
+#dropbox-developer-setup summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+#dropbox-developer-setup summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 label { display: block; font-size: 12px; margin: 14px 0 7px; }
 input[type=text], input[type=password], input[readonly] { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 11px; font-size: 13px; background: var(--paper); color: var(--ink); }
 input[readonly] { font-size: 11px; }

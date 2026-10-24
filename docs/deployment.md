@@ -6,6 +6,8 @@ minijour builds into static HTML, CSS, JavaScript, icons, and WebAssembly. It ne
 
 ## Configure Dropbox
 
+**These steps are for the website operator—not for each journal user. Register the app once and reuse its key for later builds.** Visitors only connect their own Dropbox account and choose or enter their cloud password.
+
 Register one app in the [Dropbox App Console](https://www.dropbox.com/developers/apps):
 
 1. Choose **Scoped access** and **App folder**.
@@ -16,7 +18,7 @@ Register one app in the [Dropbox App Console](https://www.dropbox.com/developers
 
 The app key is public and included in the browser build. Never put an app secret, access token, or refresh token in a `VITE_` variable. Authorization uses code flow with SHA-256 PKCE and state validation. Tokens stay on the authorizing device and refresh automatically.
 
-With a configured key, visitors choose **Connect Dropbox**, then create or enter their cloud password. Builds without a key expose manual configuration for self-hosting and development. Use the same app key and Dropbox account on devices that should share a journal.
+With a configured key, visitors choose **Connect Dropbox**, then create or enter their cloud password. Developer fields are hidden. Builds without a key explain that the site operator has not configured Dropbox; manual fields stay collapsed under **Self-hosting and developer setup**. A manually entered key applies only to that browser. To configure the website for all visitors, set `VITE_DROPBOX_APP_KEY` at build time and redeploy. Use the same app key and Dropbox account on devices that should share a journal.
 
 Dropbox permits HTTP OAuth redirects for `localhost`, for example `http://localhost:5173/journal/`. Use HTTPS on actual devices: HTTP LAN addresses do not provide the secure context required by installation and other browser APIs.
 
@@ -46,7 +48,7 @@ The service worker caches app assets including Automerge's WebAssembly, not Drop
 The default project URL is `https://folinimarc.github.io/minijour/`; it is not necessarily deployed yet. Register `https://folinimarc.github.io/minijour/journal/` as the Dropbox redirect URI.
 
 1. Choose **Settings → Pages → Source → GitHub Actions**.
-2. Add public repository variable `VITE_DROPBOX_APP_KEY` under **Settings → Secrets and variables → Actions → Variables**.
+2. Add public repository variable `VITE_DROPBOX_APP_KEY` under **Settings → Secrets and variables → Actions → Variables**. Changing it does not update an existing static deployment: build and deploy a new release, then accept the installed PWA update if needed.
 3. The release workflow sets `VITE_BASE_PATH` to `/<repository-name>/`. For a custom domain root, set the repository variable `VITE_BASE_PATH` to `/`.
 4. Allow the `github-pages` environment to deploy the intended release tags.
 5. Follow the [release procedure](releasing.md). The public site is deployed from release tags rather than each development commit.

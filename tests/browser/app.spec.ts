@@ -178,10 +178,19 @@ class DropboxMock {
   }
 }
 
+async function configureDropbox(page: Page) {
+  await expect(page.locator('#dropbox-setup')).toBeVisible();
+  const setup = page.getByText('Self-hosting and developer setup', { exact: true });
+  if (await setup.isVisible()) {
+    const appKey = page.getByLabel('Dropbox app key', { exact: true });
+    if (!await appKey.isVisible()) await setup.click();
+    await appKey.fill('testkey');
+  }
+}
+
 async function connect(page: Page) {
   await page.getByRole('button', { name: 'Settings and backup' }).click();
-  const appKey = page.getByLabel('Dropbox app key', { exact: true });
-  if (await appKey.isVisible()) await appKey.fill('testkey');
+  await configureDropbox(page);
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
   await unlock(page);
 }
@@ -246,6 +255,9 @@ test('configured deployments hide developer setup and use the shared public app 
   await page.getByRole('button', { name: 'Settings and backup' }).click();
   await expect(page.getByLabel('Dropbox app key', { exact: true })).toBeHidden();
   await expect(page.getByLabel('OAuth redirect URI')).toBeHidden();
+  await expect(page.getByText('Self-hosting and developer setup', { exact: true })).toBeHidden();
+  await expect(page.locator('#dropbox-unconfigured')).toBeHidden();
+  await expect(page.locator('#connection-description')).toContainText('You don’t need a Dropbox developer account');
   const authorization = page.waitForRequest(request => request.url().startsWith('https://www.dropbox.com/oauth2/authorize?'));
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
   expect(new URL((await authorization).url()).searchParams.get('client_id')).toBe(process.env.VITE_DROPBOX_APP_KEY);
@@ -324,8 +336,7 @@ test('requires matching passwords on setup and keeps local writing available aft
   const mock = new DropboxMock(); await mock.install(context);
   await openJournal(page);
   await page.getByRole('button', { name: 'Settings and backup' }).click();
-  const appKey = page.getByLabel('Dropbox app key', { exact: true });
-  if (await appKey.isVisible()) await appKey.fill('testkey');
+  await configureDropbox(page);
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
   await page.getByLabel('Cloud password', { exact: true }).fill(PASSWORD);
   await page.getByLabel('Repeat cloud password').fill('different password');
@@ -603,4 +614,31 @@ test('honors cancellation while the confirmation sync is still in flight', async
   await expect(page.getByRole('button', { name: 'Clean up unused photos' })).toBeEnabled();
   await expect(page.locator('#photo-cleanup-review')).toBeHidden();
   expect(await storedPhotos(page)).toEqual([name]);
+});
+
+
+test('explains missing website setup without asking visitors to create a Dropbox app', async ({ page, context }) => {
+  test.skip(!!process.env.VITE_DROPBOX_APP_KEY, 'Only unconfigured builds expose the self-hosting fallback.');
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page);
+  await page.keyboard.insertText('Writing works without Dropbox.');
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await expect(page.locator('#connection-description')).toContainText('hasn’t been configured for this website');
+  await expect(page.locator('#dropbox-unconfigured')).toContainText('The site operator needs to enable Dropbox sync');
+  await expect(page.locator('#dropbox-unconfigured')).toContainText('You don’t need to create a Dropbox app');
+  await expect(page.getByLabel('Dropbox app key', { exact: true })).toBeHidden();
+  await expect(page.getByLabel('OAuth redirect URI')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Connect Dropbox', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Download backup' })).toBeEnabled();
+  expect(mock.apiCalls).toBe(0);
+  await page.getByText('Self-hosting and developer setup', { exact: true }).click();
+  await expect(page.locator('#dropbox-developer-setup')).toContainText('Only the website operator');
+  await expect(page.locator('#dropbox-developer-setup')).toContainText('before building, then redeploy');
+  await page.getByLabel('Dropbox app key', { exact: true }).fill('not an app key');
+  await expect(page.getByRole('button', { name: 'Connect Dropbox', exact: true })).toBeHidden();
+  await page.getByLabel('Dropbox app key', { exact: true }).fill('testkey');
+  await expect(page.getByRole('button', { name: 'Connect Dropbox', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
+  await unlock(page);
+  await expect(page.locator('.cm-content')).toContainText('Writing works without Dropbox.');
 });

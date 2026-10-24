@@ -19,9 +19,15 @@ export async function setupCloudSettings(
   let unlocked = false;
   let working = false;
   let inspected = false;
+  const hostedKey = import.meta.env.VITE_DROPBOX_APP_KEY?.trim() || '';
+  const hasAppKey = () => /^[a-zA-Z0-9]+$/.test(ui.appKey.value.trim());
   const setWorking = (value: boolean) => { working = value; options.activity(value); };
   const show = () => {
     ui.setup.hidden = !!cloud;
+    ui.unconfigured.hidden = !!cloud || hasAppKey();
+    ui.accountHelp.hidden = !hasAppKey();
+    ui.connect.hidden = !hasAppKey();
+    ui.connect.disabled = !hasAppKey();
     ui.connected.hidden = !cloud;
     ui.vaultForm.hidden = !cloud || unlocked || !inspected;
     ui.checkCloud.hidden = !cloud || unlocked || inspected;
@@ -31,7 +37,8 @@ export async function setupCloudSettings(
     ui.connectionDescription.textContent = unlocked
       ? 'Connected. Your journal syncs encrypted to your Dropbox.'
       : cloud ? 'Dropbox is connected. Unlock cloud access to sync. You can keep writing locally.'
-      : 'Your journal saves on this device. Connect your Dropbox for encrypted sync across devices.';
+      : hasAppKey() ? 'Connect your own Dropbox account for encrypted sync. You don’t need a Dropbox developer account.'
+      : 'Your journal saves on this device. Dropbox sync hasn’t been configured for this website.';
     ui.confirmation.hidden = !!header;
     ui.password.autocomplete = header ? 'current-password' : 'new-password';
     ui.passwordConfirm.required = !header;
@@ -61,8 +68,9 @@ export async function setupCloudSettings(
     }
     ui.legacy.hidden = !(await cloud.legacy().list()).length;
   };
-  ui.appKey.value = import.meta.env.VITE_DROPBOX_APP_KEY || await local.setting<string>('dropbox-app-key') || '';
-  ui.developerSetup.hidden = !!import.meta.env.VITE_DROPBOX_APP_KEY;
+  ui.appKey.value = hostedKey || await local.setting<string>('dropbox-app-key') || '';
+  ui.developerSetup.hidden = !!hostedKey;
+  ui.appKey.oninput = show;
   ui.redirect.value = redirectUri();
   ui.connect.onclick = () => { void (async () => {
     ui.connect.disabled = true;

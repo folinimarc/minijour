@@ -38,17 +38,21 @@ export function mountShell() {
       <div class="dialog-header"><h1 id="settings-title">Settings</h1><button id="close-settings" class="icon-button" aria-label="Close settings">${icon('close')}</button></div>
       <section class="settings-section">
         <h2>${icon('cloud')}Dropbox sync</h2>
-        <p id="connection-description">Your journal saves on this device. Connect Dropbox to keep writing across devices.</p>
-        <div id="dropbox-setup">
-          <div id="dropbox-developer-setup">
+        <p id="connection-description">Your journal saves on this device.</p>
+        <div id="dropbox-setup" hidden>
+          <p id="dropbox-unconfigured" class="help" hidden>The site operator needs to enable Dropbox sync. You don’t need to create a Dropbox app. You can keep writing and downloading backups.</p>
+          <details id="dropbox-developer-setup" hidden>
+          <summary>Self-hosting and developer setup</summary>
+          <p class="help">Only the website operator needs to register a Dropbox app. One app serves all visitors; each person connects their own Dropbox account.</p>
+          <p class="help">Create a scoped <strong>App folder</strong> app in the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer">Dropbox App Console</a>. Enable <code>files.metadata.read</code>, <code>files.content.read</code>, and <code>files.content.write</code>.</p>
+          <p class="help">To enable Dropbox for everyone, set the public <code>VITE_DROPBOX_APP_KEY</code> before building, then redeploy the website. Never include an app secret. The manual key below applies only to this browser.</p>
           <label for="app-key">Dropbox app key</label>
           <input id="app-key" type="text" spellcheck="false" autocomplete="off" placeholder="Your public app key" />
-          <p class="help">Create a scoped <strong>App folder</strong> app in the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer">Dropbox App Console</a>. Enable <code>files.metadata.read</code>, <code>files.content.read</code>, and <code>files.content.write</code>.</p>
           <label for="redirect-uri">OAuth redirect URI</label><input id="redirect-uri" readonly />
           <p class="help">Add this exact address to your app’s redirect URIs. Use the same app key on each device.</p>
-          </div>
-          <p class="help">Connect your own Dropbox account. Local entries combine with your journal there. This browser’s journal stays associated with that account after disconnecting.</p>
-          <button id="connect-button" class="primary-button">Connect Dropbox</button>
+          </details>
+          <p id="dropbox-account-help" class="help" hidden>Local entries combine with your journal in your own Dropbox. This browser’s journal stays associated with that account after disconnecting.</p>
+          <button id="connect-button" class="primary-button" hidden>Connect Dropbox</button>
         </div>
         <div id="dropbox-connected" class="button-row" hidden>
           <button id="sync-button" class="primary-button">Sync now</button>
@@ -70,7 +74,7 @@ export function mountShell() {
           <p class="help">Older, unencrypted files still exist in your Dropbox app folder under <code>minijour-v1</code>. Import them to include entries from other devices. Importing leaves those files and Dropbox version history in place; remove old copies separately in Dropbox if needed.</p>
           <button id="import-legacy-button" class="secondary-button">Import older Dropbox files</button>
         </div>
-        <p class="help">Text, editing history, and photos are encrypted on this device before upload. Dropbox can still see file sizes and upload times. Sync runs while the app is open and cloud access is unlocked.</p>
+        <p class="help">When connected, text, editing history, and photos are encrypted on this device before upload. Dropbox can still see file sizes and upload times. Sync runs while the app is open and cloud access is unlocked.</p>
       </section>
       <section class="settings-section">
         <h2>Download and restore</h2>
@@ -116,7 +120,8 @@ export function mountShell() {
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),
     photoCleanupSummary: get<HTMLParagraphElement>('photo-cleanup-summary'),
     confirmPhotoCleanup: get<HTMLButtonElement>('confirm-photo-cleanup'), cancelPhotoCleanup: get<HTMLButtonElement>('cancel-photo-cleanup'),
-    developerSetup: get<HTMLDivElement>('dropbox-developer-setup'),
+    developerSetup: get<HTMLDetailsElement>('dropbox-developer-setup'),
+    unconfigured: get<HTMLParagraphElement>('dropbox-unconfigured'), accountHelp: get<HTMLParagraphElement>('dropbox-account-help'),
     vaultForm: get<HTMLFormElement>('vault-form'), vaultDescription: get<HTMLParagraphElement>('vault-description'),
     password: get<HTMLInputElement>('cloud-password'), passwordConfirm: get<HTMLInputElement>('cloud-password-confirm'),
     confirmation: get<HTMLDivElement>('password-confirmation'), remember: get<HTMLInputElement>('remember-cloud'),

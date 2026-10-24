@@ -26,7 +26,7 @@ The app focuses the editor on opening. Browsers control whether that raises the 
 
 On a configured deployment, choose **Connect Dropbox**, sign in to your own Dropbox account, and authorize minijour. Choose a cloud password of at least 12 characters, or enter your existing cloud password. You do not need a Dropbox developer account. On another device, visit the same site and connect the same Dropbox account and unlock with the same cloud password.
 
-If you see app-key setup fields, the deployment has not configured its Dropbox integration. Its operator can follow the [deployment guide](deployment.md#configure-dropbox). Developer configuration is separate from signing into personal Dropbox storage.
+If settings says **Dropbox sync hasn’t been configured for this website**, its operator needs to enable the integration. You do not need to register a Dropbox app. You can keep writing and downloading backups. The collapsed **Self-hosting and developer setup** section is for people running the website; operators can follow the [deployment guide](deployment.md#configure-dropbox).
 
 Unlocking combines local entries with the journal in your Dropbox app folder. Sync runs after edits settle, when opening/returning online, and every 30 seconds while visible. Check the saved status before switching devices if you need your latest edit immediately. Uploads cannot be guaranteed while the app is closed or suspended.
 

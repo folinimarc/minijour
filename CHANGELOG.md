@@ -28,6 +28,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Fixed
 
+- Clearly identify missing Dropbox setup as a website-operator task and keep manual developer fields collapsed, while configured websites retain the simple personal-account connection flow.
+
 - Block connecting a local journal to another Dropbox account or app, including after disconnecting, to prevent accidental cross-account uploads.
 - Prevent a pending unlock in another tab from restoring a remembered encryption key after Dropbox disconnects.
 
