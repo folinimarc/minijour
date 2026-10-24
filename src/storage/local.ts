@@ -1,9 +1,11 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import * as A from '@automerge/automerge';
 import { loadDay, mergeDays } from '../domain/day';
+import { PHOTO_NAME, referencedPhotos } from '../domain/photos';
 
 export type Photo = { name: string; blob: Blob };
 export const VAULT_KEY_SETTING = 'cloud-vault-key';
+const PHOTO_DELETIONS = 'photo-deletions-v1';
 
 interface Database extends DBSchema {
   days: { key: string; value: Uint8Array };
@@ -11,7 +13,8 @@ interface Database extends DBSchema {
   settings: { key: string; value: unknown };
 }
 
-/** IndexedDB is the durable, on-device copy. Settings are never exported. */
+/** IndexedDB is the durable on-device copy. Credentials and keys stay here;
+ * backups explicitly include permanent photo deletion metadata. */
 export class LocalStore {
   private constructor(private db: IDBPDatabase<Database>) {}
 
@@ -48,10 +51,39 @@ export class LocalStore {
 
   async photoNames(): Promise<string[]> { return this.db.getAllKeys('photos'); }
   async photo(name: string): Promise<Blob | undefined> { return this.db.get('photos', name); }
-  async savePhoto(name: string, blob: Blob): Promise<void> {
-    const tx = this.db.transaction('photos', 'readwrite');
-    await tx.store.put(blob, name);
+  async savePhoto(name: string, blob: Blob): Promise<boolean> {
+    const tx = this.db.transaction(['photos', 'settings'], 'readwrite');
+    const deleted = await tx.objectStore('settings').get(PHOTO_DELETIONS) as string[] | undefined;
+    if (deleted?.includes(name)) { await tx.done; return false; }
+    await tx.objectStore('photos').put(blob, name);
     await tx.done;
+    return true;
+  }
+  async photoDeletions(): Promise<Set<string>> {
+    return new Set(await this.setting<string[]>(PHOTO_DELETIONS));
+  }
+
+  async deletePhotos(names: Iterable<string>, options: { onlyUnused?: boolean } = {}): Promise<string[]> {
+    const candidates = [...new Set(names)];
+    if (!candidates.every(name => PHOTO_NAME.test(name))) throw new Error('Invalid photo name.');
+    // Serialize with photo saves AND edits in other tabs. A reference added
+    // after the confirmation opened must still protect that photo at deletion.
+    const tx = this.db.transaction(['photos', 'settings', 'days'], 'readwrite');
+    const settings = tx.objectStore('settings');
+    const deleted = new Set(await settings.get(PHOTO_DELETIONS) as string[] | undefined);
+    const references = options.onlyUnused
+      ? referencedPhotos((await tx.objectStore('days').getAll()).map(bytes => loadDay(bytes).text)) : new Set<string>();
+    const changed: string[] = [];
+    for (const name of candidates) {
+      if (references.has(name)) continue;
+      const photo = await tx.objectStore('photos').get(name);
+      if (!deleted.has(name) || photo) changed.push(name);
+      deleted.add(name);
+      await tx.objectStore('photos').delete(name);
+    }
+    if (changed.length) await settings.put([...deleted].sort(), PHOTO_DELETIONS);
+    await tx.done;
+    return changed;
   }
   async setting<T>(key: string): Promise<T | undefined> {
     return await this.db.get('settings', key) as T | undefined;

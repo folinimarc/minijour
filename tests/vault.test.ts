@@ -8,6 +8,7 @@ import type { RemoteFile, VaultStorage } from '../src/sync/cloud';
 class MemoryCloud implements VaultStorage {
   files = new Map<string, Uint8Array>();
   revision = 0;
+  async remove(path: string): Promise<void> { this.files.delete(path); }
   async list(): Promise<RemoteFile[]> {
     return [...this.files.keys()].map(path => ({ path, revision: String(this.revision) }));
   }
@@ -149,4 +150,25 @@ it('converges offline edits and photos through encrypted storage, and imports le
   expect(phone.days.get('2026-10-24')!.text).toContain('Older memory.');
   await first.sync(); await second.sync();
   expect(laptop.days.get('2026-10-24')!.text).toContain('Older memory.');
+});
+
+it('encrypts deletion records and removes all opaque copies of a concurrently uploaded photo', async () => {
+  const cloud = new MemoryCloud();
+  const first = await EncryptedFiles.create(cloud, PASSWORD);
+  const second = await EncryptedFiles.unlock(cloud, (await EncryptedFiles.inspect(cloud))!, PASSWORD);
+  const name = `${crypto.randomUUID()}.jpg`, path = `/photos/${name}`;
+  await first.list(); await second.list();
+  await first.upload(path, bytes('photo')); await second.upload(path, bytes('photo'));
+  expect(cloud.files.size).toBe(3); // Header and two different encrypted names.
+  await first.list();
+  await first.upload(`/deleted-photos/${name}.json`, bytes(JSON.stringify({ version: 1, photos: [name] })));
+  await first.remove(path);
+  expect(cloud.files.size).toBe(2); // Only the header and encrypted deletion record.
+  const listed = await second.list();
+  expect(listed.map(file => file.path)).toEqual([`/deleted-photos/${name}.json`]);
+  for (const [opaque, contents] of cloud.files) {
+    expect(opaque).not.toContain(name);
+    expect(text(contents)).not.toContain(name);
+  }
+  await first.remove(path); // Already absent is a successful removal.
 });

@@ -98,5 +98,12 @@ export class Journal {
     this.emit({ photos: true });
   }
 
+  async deletePhotos(names: Iterable<string>, options: { onlyUnused?: boolean } = {}): Promise<string[]> {
+    if (options.onlyUnused) await this.flush();
+    const removed = await this.local.deletePhotos(names, options);
+    if (removed.length) this.photosChanged();
+    return removed;
+  }
+
   close(): void { this.channel?.close(); }
 }

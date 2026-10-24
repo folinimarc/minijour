@@ -16,7 +16,7 @@ class PhotoWidget extends WidgetType {
   toDOM(): HTMLElement {
     const figure = document.createElement('span');
     figure.className = 'photo-preview';
-    figure.textContent = 'Photo will appear when it has downloaded.';
+    figure.textContent = 'Photo is unavailable or has not downloaded yet.';
     void this.urls.get(this.name).then(url => {
       if (!url) return;
       const image = document.createElement('img');

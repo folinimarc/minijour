@@ -8,6 +8,7 @@ import { LocalStore } from './storage/local';
 import { exportJournal, importJournal } from './storage/backup';
 import { finishDropboxConnection } from './sync/dropbox';
 import { setupCloudSettings } from './ui/cloud-settings';
+import { setupPhotoCleanup } from './ui/photo-cleanup';
 import { SyncEngine } from './sync/engine';
 import { DayEditor } from './ui/editor';
 import { PhotoUrls, preparePhoto } from './ui/photos';
@@ -30,6 +31,8 @@ async function start(): Promise<void> {
   const editors = new Map<string, DayEditor>();
   let activeDate = localDate();
   let syncing = false;
+  let cleaning = false;
+  let cloudWorking = false;
   let syncError = false;
   let lastSync: Date | undefined;
   let dirty = true;
@@ -45,21 +48,30 @@ async function start(): Promise<void> {
 
   function updateStatus(): void {
     ui.status.classList.toggle('has-error', !!journal.saveError || syncError);
-    ui.status.classList.toggle('is-busy', journal.pending > 0 || syncing);
+    ui.status.classList.toggle('is-busy', journal.pending > 0 || syncing || cleaning);
     ui.statusText.textContent = journal.saveError ? 'Could not save on this device'
       : journal.pending ? 'Saving…'
       : !navigator.onLine ? 'Saved on device · offline'
+      : cleaning ? 'Saved on device · updating photos…'
       : syncing ? 'Saved on device · syncing…'
       : syncError ? 'Saved on device · sync needs attention'
       : engine && lastSync && !dirty ? 'Saved to Dropbox'
       : 'Saved on this device';
-    ui.sync.disabled = syncing;
+    ui.sync.disabled = syncing || cleaning;
     ui.sync.textContent = syncing ? 'Syncing…' : 'Sync now';
   }
 
-  async function sync(): Promise<void> {
-    if (!engine || !navigator.onLine) { updateStatus(); return; }
-    if (syncing) { void engine.sync().catch(() => {}); return; }
+  async function sync(strict = false): Promise<void> {
+    if (cleaning && !strict) return;
+    if (!engine || !navigator.onLine) {
+      updateStatus();
+      if (strict) throw new Error('Dropbox sync is unavailable. No photos were deleted.');
+      return;
+    }
+    if (syncing) {
+      try { await engine.sync(); } catch (error) { if (strict) throw error; }
+      return;
+    }
     syncing = true;
     updateStatus();
     try {
@@ -70,12 +82,13 @@ async function start(): Promise<void> {
     } catch (error) {
       syncError = true;
       notify(error);
+      if (strict) throw error;
     } finally { syncing = false; updateStatus(); }
   }
 
   function scheduleSync(): void {
     dirty = true;
-    if (!engine) return;
+    if (!engine || cleaning) return;
     if (syncing) { void engine.sync().catch(() => {}); return; }
     clearTimeout(syncTimer);
     syncTimer = setTimeout(() => { void sync(); }, 1500);
@@ -118,7 +131,7 @@ async function start(): Promise<void> {
       renderDay(event.date);
       scheduleSync();
     } else if (event.photos) {
-      urls.version++;
+      urls.clear();
       for (const editor of editors.values()) editor.refreshPhotos();
       scheduleSync();
     }
@@ -225,7 +238,7 @@ async function start(): Promise<void> {
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      void openToday(false).then(sync).catch(notify);
+      void openToday(false).then(() => sync()).catch(notify);
     } else {
       closePhotoMenu();
       void sync();
@@ -250,8 +263,19 @@ async function start(): Promise<void> {
     ui.install.hidden = false;
     ui.install.onclick = () => { void install.prompt().then(() => install.userChoice).then(() => { ui.install.hidden = true; }); };
   });
+  setupPhotoCleanup(ui, journal, {
+    cloudReady: () => !!engine,
+    cloudBusy: () => cloudWorking,
+    sync: () => sync(true),
+    busy: value => {
+      cleaning = value; updateStatus();
+      if (!value && dirty) scheduleSync();
+    },
+    notify,
+  });
   await setupCloudSettings(ui, journal, {
-    busy: () => syncing,
+    busy: () => syncing || cleaning,
+    activity: value => { cloudWorking = value; },
     change: next => {
       clearTimeout(syncTimer);
       engine = next; syncError = false; lastSync = undefined; dirty = true;

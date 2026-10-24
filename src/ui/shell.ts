@@ -74,8 +74,18 @@ export function mountShell() {
       </section>
       <section class="settings-section">
         <h2>Download and restore</h2>
-        <p>Download your Markdown, photos, and editing history as an unencrypted ZIP. Restoring a backup combines entries with this journal.</p>
+        <p>Download your Markdown, referenced photos, and text editing history as an unencrypted ZIP. Restoring combines entries and keeps permanent photo deletions.</p>
         <div class="button-row"><button id="export-button" class="secondary-button">Download backup</button><button id="restore-button" class="text-button">Restore backup</button></div>
+      </section>
+      <section class="settings-section settings-small">
+        <h2>Photo storage</h2>
+        <p>Removing a photo link keeps its file for undo. You can permanently remove files that no current entry uses.</p>
+        <button id="review-photos-button" class="secondary-button">Clean up unused photos</button>
+        <div id="photo-cleanup-review" hidden>
+          <p id="photo-cleanup-summary"></p>
+          <p class="help">This permanently removes these photos from this device and, when connected, Dropbox. Deletion syncs to other devices. Undo, old backups, or offline edits may bring back links with missing images. Existing backups, older Dropbox files, and cloud version history are not changed.</p>
+          <div class="button-row"><button id="confirm-photo-cleanup" class="primary-button">Permanently delete photos</button><button id="cancel-photo-cleanup" class="text-button">Cancel</button></div>
+        </div>
       </section>
       <section class="settings-section settings-small">
         <h2>Install</h2>
@@ -103,6 +113,9 @@ export function mountShell() {
     connect: get<HTMLButtonElement>('connect-button'), disconnect: get<HTMLButtonElement>('disconnect-button'),
     sync: get<HTMLButtonElement>('sync-button'), export: get<HTMLButtonElement>('export-button'),
     restore: get<HTMLButtonElement>('restore-button'), setup: get<HTMLDivElement>('dropbox-setup'),
+    reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),
+    photoCleanupSummary: get<HTMLParagraphElement>('photo-cleanup-summary'),
+    confirmPhotoCleanup: get<HTMLButtonElement>('confirm-photo-cleanup'), cancelPhotoCleanup: get<HTMLButtonElement>('cancel-photo-cleanup'),
     developerSetup: get<HTMLDivElement>('dropbox-developer-setup'),
     vaultForm: get<HTMLFormElement>('vault-form'), vaultDescription: get<HTMLParagraphElement>('vault-description'),
     password: get<HTMLInputElement>('cloud-password'), passwordConfirm: get<HTMLInputElement>('cloud-password-confirm'),

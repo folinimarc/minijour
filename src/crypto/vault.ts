@@ -8,7 +8,7 @@ export type RememberedVault = { descriptor: string; key: CryptoKey };
 const HEADER = '/vault.json';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
-const logicalPath = /^\/(?:days\/\d{4}-\d{2}-\d{2}\/[a-f0-9-]{36}\.automerge|photos\/[a-f0-9-]{36}\.jpg)$/;
+const logicalPath = /^\/(?:days\/\d{4}-\d{2}-\d{2}\/[a-f0-9-]{36}\.automerge|photos\/[a-f0-9-]{36}\.jpg|deleted-photos\/[a-f0-9-]{36}\.jpg\.json)$/;
 const objectPath = /^\/objects\/([a-f0-9]{2,240})\.bin$/;
 const hex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 function unhex(value: string): Uint8Array<ArrayBuffer> {
@@ -46,7 +46,7 @@ async function passwordKey(password: string, salt: string): Promise<CryptoKey> {
  * Hex names survive Dropbox's lowercased paths. No dates appear in cloud names.
  */
 export class EncryptedFiles implements CloudFiles {
-  private names = new Map<string, string>();
+  private names = new Map<string, string[]>();
   readonly descriptor: string;
   private constructor(private cloud: VaultStorage, private header: Header, readonly key: CryptoKey) {
     this.descriptor = JSON.stringify(header);
@@ -111,7 +111,7 @@ export class EncryptedFiles implements CloudFiles {
     const files = await this.cloud.list();
     const current = await EncryptedFiles.inspect(this.cloud, files);
     if (JSON.stringify(current) !== this.descriptor) throw new Error('The cloud encryption header changed. Lock cloud access and unlock again before syncing.');
-    const names = new Map<string, string>();
+    const names = new Map<string, string[]>();
     const result: RemoteFile[] = [];
     for (const file of files.sort((a, b) => a.path.localeCompare(b.path))) {
       if (file.path === HEADER) continue;
@@ -123,8 +123,9 @@ export class EncryptedFiles implements CloudFiles {
       if (!logicalPath.test(path)) throw new Error('Invalid path inside an encrypted filename.');
       // Concurrent uploads of the same immutable photo can produce two opaque
       // names. Choose one consistently. Day writers always have distinct UUIDs.
-      if (names.has(path)) continue;
-      names.set(path, file.path);
+      const copies = names.get(path);
+      if (copies) { copies.push(file.path); continue; }
+      names.set(path, [file.path]);
       result.push({ path, revision: file.revision });
     }
     this.names = names;
@@ -132,7 +133,7 @@ export class EncryptedFiles implements CloudFiles {
   }
 
   async download(path: string): Promise<Uint8Array> {
-    const name = this.names.get(path);
+    const name = this.names.get(path)?.[0];
     if (!name) throw new Error('Encrypted file was not listed. Retry sync.');
     try { return await decrypt(this.key, await this.cloud.download(name), aad(this.header.id, `file:${name}`)); }
     catch { throw new Error('An encrypted file could not be downloaded or verified. Sync stopped; local entries are safe.'); }
@@ -140,13 +141,19 @@ export class EncryptedFiles implements CloudFiles {
 
   async upload(path: string, bytes: Uint8Array): Promise<RemoteFile> {
     if (!logicalPath.test(path)) throw new Error('Unsupported journal file path.');
-    let name = this.names.get(path);
+    let name = this.names.get(path)?.[0];
     if (!name) {
       name = `/objects/${hex(await encrypt(this.key, encoder.encode(path), aad(this.header.id, 'name')))}.bin`;
-      this.names.set(path, name);
+      this.names.set(path, [name]);
     }
     const result = await this.cloud.upload(name, await encrypt(this.key, bytes, aad(this.header.id, `file:${name}`)));
     return { path, revision: result.revision };
   }
 
+  async remove(path: string): Promise<void> {
+    // A photo can have several opaque names after simultaneous first uploads.
+    // Removing only the selected download copy would leave the others behind.
+    for (const name of this.names.get(path) ?? []) await this.cloud.remove(name);
+    this.names.delete(path);
+  }
 }

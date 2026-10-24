@@ -32,18 +32,21 @@ src/
   landing.css         Landing-page layout
   main.ts             Wires the application together and handles user actions
   domain/
+    photos.ts         Conservative photo references and deletion record format
     day.ts            Date helpers and Automerge document operations
     journal.ts        In-memory journal, durable saves, change notifications
   crypto/
     vault.ts          Password wrapping, encryption, and encrypted file adapter
   storage/
     local.ts          IndexedDB access, including safe saves from multiple tabs
-    backup.ts         Portable ZIP export and lossless backup restore
+    backup.ts         Portable ZIP export and text history restore
+    photo-cleanup.ts  Candidate photo IDs and sizes for explicit review
   sync/
     cloud.ts          File contract, plus atomic create for vault storage
     dropbox.ts        Dropbox OAuth and API requests
     engine.ts         Pull, Automerge merge, and push
   ui/
+    photo-cleanup.ts  Review, confirmation, and required cloud sync
     cloud-settings.ts Connection, password unlock, and legacy import controls
     shell.ts          Static application markup and element references
     editor.ts         CodeMirror editor and photo previews
@@ -83,7 +86,7 @@ The sync engine works with logical paths `/days/YYYY-MM-DD/<writer-id>.automerge
 minijour-encrypted-v1/
   vault.json               Public format version, vault ID, salt, wrapped key
   objects/
-    <encrypted-name>.bin   Encrypted document or photo
+    <encrypted-name>.bin   Encrypted document, photo, or deletion record
 ```
 
 The older `minijour-v1/` folder is read only through an explicit import action. No new plaintext files are uploaded there, and importing never deletes or rewrites it. Older app versions still use that folder: update all devices to the encrypted version before continuing cross-device editing.
@@ -94,7 +97,21 @@ The engine lists checkpoints, downloads new revisions, merges them locally, tran
 
 Sync runs after edits settle, on opening/returning online, and every 30 seconds while visible. If edits arrive during a sync, another round follows. **It cannot guarantee uploads while the app is closed or suspended.** Check the saved status before switching devices if you need the latest edit immediately.
 
-We retain checkpoints and photos rather than implementing destructive remote garbage collection. Storage grows with editing history and app sessions; old snapshots aren't automatically deleted. A fresh device initially downloads the available checkpoints and photos; later polls cache unchanged checkpoint revisions in memory. These are deliberate simplicity tradeoffs, and the first areas to revisit for very large journals.
+We retain checkpoints and small permanent photo deletion records. Photo files are retained until explicit user-confirmed cleanup. Storage grows with editing history and app sessions; old snapshots aren't automatically deleted. A fresh device initially downloads the available checkpoints and photos; later polls cache unchanged checkpoint revisions in memory. These are deliberate simplicity tradeoffs, and the first areas to revisit for very large journals.
+
+### Permanent photo cleanup
+
+`domain/photos.ts` scans for `photos/<UUID>.jpg` paths conservatively, including Markdown reference links and code examples. It checks current text across all days, not just the visible editor. `storage/photo-cleanup.ts` produces a review snapshot of specific IDs and sizes. Only those IDs may be deleted when confirmed; newly unused photos need a new review.
+
+For Dropbox-bound journals, the UI requires an online, unlocked, successful sync before review and again before deletion. A failed fetch prevents local cleanup. Local removal rechecks references inside an IndexedDB read/write transaction across `days`, `photos`, and `settings`, so saved references from other tabs are respected. Ordinary Markdown deletion never triggers this operation.
+
+The same transaction records permanent deletions in the settings key `photo-deletions-v1` and removes the blobs. The value is a grow-only set represented as a sorted array of photo names. This needs no database schema upgrade. Photo saves check that set transactionally, including downloads, backup restore, and legacy import. Legacy plaintext imports cannot introduce deletion records: those files are ignored outside normal encrypted sync. Preview blob URLs are revoked and rebuilt across tabs after changes.
+
+Sync uses an immutable logical file `/deleted-photos/<photo-id>.jpg.json` for each permanent deletion, containing `{ version: 1, photos: [name] }`. Encryption hides its name and contents like other files. Records are processed before any photo transfer, and a new record must upload successfully before remote bytes are removed. Dropbox removal uses the idempotent adapter contract (`files/delete_v2`; missing files count as success). The encrypted adapter removes every opaque copy of a photo, including concurrent duplicate uploads. A stale upload arriving later is removed on a subsequent sync.
+
+Deletion wins even if an offline device or old backup later adds a reference. This explicit tradeoff avoids attachment conflict resolution or device clocks. Missing links remain editable; re-adding the original photo produces a fresh ID. Deletion records are retained permanently and restored from new backups. Existing downloaded backups, legacy plaintext cloud files, and provider version history remain outside cleanup.
+
+All clients should update before cleanup. Earlier encrypted clients reject the new logical file paths and stop sync rather than silently ignoring deletion records. Text checkpoints and the encryption header are never deleted by cleanup.
 
 ### Encryption format
 
@@ -106,7 +123,7 @@ Filenames are AES-GCM-encrypted logical paths encoded in lowercase hex, so Dropb
 
 The public `vault.json` contains `{ version, id, salt, wrappedKey }`. Atomic create-if-absent ensures simultaneous setup cannot replace another device's key. A lost response is retried against the existing header. Missing/damaged headers, wrong passwords, and authentication failures stop sync; they never trigger plaintext fallback. Keep the header with the ciphertext: neither is usable alone.
 
-The unwrapped key is non-exportable in Web Crypto. Optional remember-on-device stores that CryptoKey by IndexedDB structured cloning, bound to the exact vault descriptor; it never stores the password. Settings and keys are excluded from ZIP backups. Local data remains plaintext. This implementation has automated regression coverage, not an independent cryptographic security audit. It trusts the served JavaScript and does not prevent cloud deletion or replay of old valid ciphertext.
+The unwrapped key is non-exportable in Web Crypto. Optional remember-on-device stores that CryptoKey by IndexedDB structured cloning, bound to the exact vault descriptor; it never stores the password. Dropbox credentials, preferences, and keys are excluded from ZIP backups. Permanent photo deletion metadata is included explicitly. Local data remains plaintext. This implementation has automated regression coverage, not an independent cryptographic security audit. It trusts the served JavaScript and does not prevent cloud deletion or replay of old valid ciphertext.
 
 ### Photos and backups
 
@@ -115,8 +132,10 @@ Photos are resized to at most 2400 pixels on the longest side, converted to JPEG
 A downloaded backup ZIP contains:
 
 - `journal.md`: your entire journal as ordinary Markdown.
-- `photos/`: portable JPEG attachments.
-- `minijour/`: Automerge documents for restoring history and future merging.
+- `photos/`: portable JPEG attachments referenced by the current Markdown.
+- `minijour/`: Automerge documents for restoring text history and future merging; optional `photo-deletions.json` retains permanent photo deletion records.
+
+Export snapshots the current text, so unused photos and images mentioned only in earlier history are omitted. Export itself never deletes anything. Restore validates all metadata before importing, applies deletion records first, then photos and text. Old ZIPs without deletion metadata still work. A known deletion blocks an old photo from being saved, even when restoring a previous backup.
 
 Restore combines with the current journal. It never replaces the journal wholesale. Treat the ZIP as private: it contains journal content and editing history. Restore currently accepts up to 250 MB compressed / 500 MB expanded.
 
@@ -139,7 +158,7 @@ npm run test:browser
 npm run build
 ```
 
-Unit tests cover encryption round trips, authentication failures, concurrent vault setup, remembered keys, legacy import, and independent day creation, text convergence, concurrent local saves, cursor anchors with emoji, offline sync, failed uploads, photo transfer, and backup restore. Browser tests exercise the production build: focus and persistence, photo insertion, offline reloads, midnight rollover, multiple tabs, restore, and Dropbox authorization/sync across two simulated devices.
+Unit tests cover encryption round trips, authentication failures, concurrent vault setup, remembered keys, legacy import, and independent day creation, text convergence, concurrent local saves, cursor anchors with emoji, offline sync, failed uploads, photo transfer, permanent cleanup, stale-device deletion, and backup restore. Browser tests exercise the production build: focus and persistence, photo insertion, offline reloads, midnight rollover, multiple tabs, restore, and Dropbox authorization/sync across two simulated devices.
 
 Dropbox browser tests mock the network boundary. A real Dropbox app/account and the actual mobile camera/keyboard still need a device smoke test before relying on the app for irreplaceable entries.
 

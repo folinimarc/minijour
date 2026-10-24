@@ -2,9 +2,9 @@ import * as A from '@automerge/automerge';
 import { heads, isDate, loadDay, mergeDays, type DayDoc } from '../domain/day';
 import type { Journal } from '../domain/journal';
 import type { CloudFiles, RemoteFile } from './cloud';
+import { PHOTO_NAME, PHOTO_DELETION_PATH, decodePhotoDeletions, encodePhotoDeletions } from '../domain/photos';
 
 const DAY_PATH = /^\/days\/(\d{4}-\d{2}-\d{2})\/([a-f0-9-]+)\.automerge$/;
-export const PHOTO_NAME = /^[a-f0-9-]{36}\.jpg$/;
 
 /**
  * Each running app owns one checkpoint per changed day. Separate writers never
@@ -42,6 +42,22 @@ export class SyncEngine {
 
   private async round(upload = true): Promise<void> {
     const files = await this.cloud.list();
+    const remoteDeleted = new Set<string>();
+    // Read deletion records before transferring any photo. Deletion wins over
+    // old offline references, restored backups, and in-flight stale uploads.
+    for (const file of files) {
+      // Legacy plaintext imports predate deletion records. Only the normal
+      // encrypted sync path may authorize permanent deletion from cloud data.
+      if (!upload) break;
+      const match = PHOTO_DELETION_PATH.exec(file.path);
+      if (!match) continue;
+      const bytes = await this.read(file);
+      if (bytes.length > 1024) throw new Error('Invalid photo deletion record.');
+      const names = decodePhotoDeletions(bytes);
+      if (names.length !== 1 || names[0] !== match[1]) throw new Error('Photo deletion record does not match its path.');
+      remoteDeleted.add(match[1]);
+    }
+    await this.journal.deletePhotos(remoteDeleted);
     const remoteDays = new Map<string, DayDoc>();
 
     // Pull first. Merging is synchronous; edits made during network requests are
@@ -56,14 +72,25 @@ export class SyncEngine {
       await this.journal.merge(match[1], bytes);
     }
 
+    const deleted = await this.journal.local.photoDeletions();
+    if (upload) {
+      // Make each deletion durable remotely BEFORE removing its photo. A failed
+      // publication leaves the photo remote and retries from the local record.
+      for (const name of deleted) {
+        if (!remoteDeleted.has(name)) await this.cloud.upload(`/deleted-photos/${name}.json`, encodePhotoDeletions([name]));
+      }
+      for (const file of files) {
+        if (file.path.startsWith('/photos/') && deleted.has(file.path.slice(8))) await this.cloud.remove(file.path);
+      }
+    }
     const remotePhotos = new Set(files.filter(file => file.path.startsWith('/photos/'))
       .map(file => file.path.slice('/photos/'.length)).filter(name => PHOTO_NAME.test(name)));
     let photosChanged = false;
     for (const name of remotePhotos) {
+      if ((await this.journal.local.photoDeletions()).has(name)) continue;
       if (await this.journal.local.photo(name)) continue;
       const bytes = await this.cloud.download(`/photos/${name}`);
-      await this.journal.local.savePhoto(name, new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' }));
-      photosChanged = true;
+      photosChanged = await this.journal.local.savePhoto(name, new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' })) || photosChanged;
     }
     if (photosChanged) this.journal.photosChanged();
     if (!upload) return;
@@ -71,6 +98,7 @@ export class SyncEngine {
     // Upload photos before documents that might reference them. Photos have
     // unique immutable names and do not need CRDT merging.
     for (const name of await this.journal.local.photoNames()) {
+      if ((await this.journal.local.photoDeletions()).has(name)) continue;
       if (remotePhotos.has(name)) continue;
       const blob = await this.journal.local.photo(name);
       if (blob) await this.cloud.upload(`/photos/${name}`, new Uint8Array(await blob.arrayBuffer()));

@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { unzipSync } from 'fflate';
 import * as A from '@automerge/automerge';
 import { createDay, editDay } from '../../src/domain/day';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
@@ -122,6 +124,8 @@ class DropboxMock {
   revision = 0;
   accountId = 'test-account';
   apiCalls = 0;
+  deleteFailures = 0;
+  deleteAlreadyMissing = false;
   tokenRedirects: string[] = [];
   async install(context: BrowserContext) {
     await context.route('https://www.dropbox.com/oauth2/authorize?**', route => {
@@ -157,6 +161,15 @@ class DropboxMock {
         const revision = String(++this.revision);
         this.files.set(path, { bytes: request.postDataBuffer()!, revision });
         await route.fulfill({ json: { rev: revision } });
+      } else if (endpoint.endsWith('/delete_v2')) {
+        if (this.deleteFailures > 0) {
+          this.deleteFailures--;
+          await route.fulfill({ status: 503, json: { error_summary: 'temporarily_unavailable' } });
+          return;
+        }
+        if (this.deleteAlreadyMissing) this.files.delete(args.path);
+        if (this.files.delete(args.path)) await route.fulfill({ json: { metadata: { '.tag': 'file' } } });
+        else await route.fulfill({ status: 409, json: { error_summary: 'path_lookup/not_found/.' } });
       } else if (endpoint.endsWith('/download')) {
         const file = this.files.get(args.path);
         await route.fulfill({ body: file!.bytes, contentType: 'application/octet-stream' });
@@ -407,4 +420,187 @@ test('does not remember a key when another tab disconnects during unlock', async
     };
   }));
   expect(key).toBeUndefined();
+});
+
+async function addTestPhoto(page: Page): Promise<string> {
+  await page.getByRole('button', { name: 'Add a photo', exact: true }).click();
+  await page.locator('#photo-input').setInputFiles('public/icon-192.png');
+  await expect(page.locator('.photo-preview img')).toBeVisible();
+  return (await page.locator('.cm-content').innerText()).match(/photos\/([a-f0-9-]{36}\.jpg)/)![1];
+}
+async function replaceEntry(page: Page, text = '') {
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+A');
+  if (text) await page.keyboard.insertText(text);
+  else await page.keyboard.press('Backspace');
+}
+async function storedPhotos(page: Page): Promise<string[]> {
+  return page.evaluate(() => new Promise<string[]>((resolve, reject) => {
+    const open = indexedDB.open('minijour-v1');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const request = db.transaction('photos').objectStore('photos').getAllKeys();
+      request.onsuccess = () => { db.close(); resolve(request.result as string[]); };
+      request.onerror = () => reject(request.error);
+    };
+  }));
+}
+
+test('reviews unused photos, supports cancel, excludes unused images from ZIPs, and cleans up offline', async ({ page, context }, testInfo) => {
+  await openJournal(page); const name = await addTestPhoto(page);
+  await replaceEntry(page, 'A memory without the photo.');
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download backup' }).click();
+  const path = testInfo.outputPath('without-unused-photos.zip');
+  await (await downloading).saveAs(path);
+  const entries = unzipSync(new Uint8Array(await readFile(path)));
+  expect(Object.keys(entries).filter(entry => entry.startsWith('photos/'))).toEqual([]);
+  expect(await storedPhotos(page)).toEqual([name]);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
+  await expect(page.locator('#photo-cleanup-summary')).toContainText('1 unused photo');
+  await expect(page.locator('#photo-cleanup-summary')).toContainText('KB');
+  await expect(page.locator('#photo-cleanup-review')).toContainText('Undo, old backups, or offline edits');
+  await expect(page.getByRole('button', { name: 'Permanently delete photos' })).toBeInViewport({ ratio: 0.99 });
+  await page.screenshot({ path: 'test-results/photo-cleanup-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.locator('#photo-cleanup-review')).toBeHidden();
+  expect(await storedPhotos(page)).toEqual([name]);
+  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
+  await page.getByRole('button', { name: 'Permanently delete photos' }).click();
+  await expect(page.getByRole('alert')).toContainText('Permanently removed 1 unused photo');
+  expect(await storedPhotos(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await page.keyboard.press('ControlOrMeta+Z');
+  await expect(page.locator('.photo-preview')).toContainText('unavailable');
+  await expect(page.locator('.photo-preview img')).toHaveCount(0);
+});
+
+test('keeps a reviewed photo when another tab adds a reference before confirmation', async ({ page, context }) => {
+  await openJournal(page); const name = await addTestPhoto(page);
+  await replaceEntry(page, 'Removed the image.');
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
+  await expect(page.locator('#photo-cleanup-summary')).toContainText('1 unused photo');
+  const other = await context.newPage(); await openJournal(other);
+  await replaceEntry(other, `Keep this reference: ![Photo](photos/${name})`);
+  await expect(other.getByRole('status')).toHaveText('Saved on this device');
+  await page.getByRole('button', { name: 'Permanently delete photos' }).click();
+  await expect(page.getByRole('alert')).toContainText('No photos removed');
+  expect(await storedPhotos(page)).toEqual([name]);
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await expect(page.locator('.photo-preview img')).toBeVisible();
+});
+
+test('syncs encrypted cleanup to an offline device without re-uploading its retained photo', async ({ browser }) => {
+  const mock = new DropboxMock();
+  const phone = await browser.newContext({ serviceWorkers: 'block' });
+  const laptop = await browser.newContext({ serviceWorkers: 'block' });
+  await mock.install(phone); await mock.install(laptop);
+  const first = await phone.newPage(), second = await laptop.newPage();
+  await openJournal(first); const name = await addTestPhoto(first); await connect(first);
+  await openJournal(second); await connect(second);
+  await expect(second.locator('.photo-preview img')).toBeVisible();
+  await laptop.setOffline(true);
+  await second.locator('.cm-content').click();
+  await second.keyboard.press('ControlOrMeta+End');
+  await second.keyboard.insertText(`\nAn offline copy: ![Photo](photos/${name})`);
+  await replaceEntry(first, 'Removed on the phone.'); await sync(first);
+  const before = new Set(mock.files.keys());
+  await first.getByRole('button', { name: 'Settings and backup' }).click();
+  await first.getByRole('button', { name: 'Clean up unused photos' }).click();
+  await first.getByRole('button', { name: 'Permanently delete photos' }).click();
+  await expect(first.getByRole('alert')).toContainText('Permanently removed 1 unused photo');
+  const removed = [...before].filter(path => !mock.files.has(path));
+  expect(removed).toHaveLength(1);
+  expect(await storedPhotos(first)).toEqual([]);
+  await first.getByRole('button', { name: 'Close settings' }).click();
+  await laptop.setOffline(false); await sync(second); await sync(first);
+  expect(await storedPhotos(second)).toEqual([]);
+  await expect(second.locator('.photo-preview')).toContainText('unavailable');
+  expect(removed.every(path => !mock.files.has(path))).toBe(true);
+  await second.reload();
+  await expect(second.locator('.photo-preview')).toContainText('unavailable');
+  expect(await storedPhotos(second)).toEqual([]);
+  await phone.close(); await laptop.close();
+});
+
+test('requires unlocked online Dropbox access before cleanup and retries interrupted cloud removal', async ({ page, context }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page); const name = await addTestPhoto(page); await connect(page);
+  await replaceEntry(page, 'Photo removed from this entry.'); await sync(page);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
+  await expect(page.getByRole('alert')).toContainText('Go online');
+  await expect(page.locator('#photo-cleanup-review')).toBeHidden();
+  expect(await storedPhotos(page)).toEqual([name]);
+  await context.setOffline(false);
+  await expect(page.getByRole('status')).toHaveText('Saved to Dropbox');
+  await page.getByRole('button', { name: 'Lock cloud', exact: true }).click();
+  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
+  await expect(page.getByRole('alert')).toContainText('Connect and unlock');
+  expect(await storedPhotos(page)).toEqual([name]);
+  await unlock(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
+  mock.deleteFailures = 1;
+  mock.deleteAlreadyMissing = true; // Retry sees Dropbox path_lookup/not_found.
+  const before = new Set(mock.files.keys());
+  await page.getByRole('button', { name: 'Permanently delete photos' }).click();
+  await expect(page.getByRole('alert')).toContainText('Dropbox cleanup is pending');
+  expect(await storedPhotos(page)).toEqual([]);
+  await expect(page.getByRole('status')).toHaveText('Saved to Dropbox');
+  expect([...before].filter(path => !mock.files.has(path))).toHaveLength(1);
+});
+
+
+test('waits for an in-progress legacy import before allowing cleanup', async ({ page, context }) => {
+  const mock = new DropboxMock();
+  const path = `/minijour-v1/days/2020-01-01/${crypto.randomUUID()}.automerge`;
+  mock.files.set(path, { bytes: Buffer.from(A.save(editDay(createDay('2020-01-01'), 'An older entry.'))), revision: 'old' });
+  await mock.install(context);
+  await openJournal(page); await connect(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  let release!: () => void, reached!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const waiting = new Promise<void>(resolve => { reached = resolve; });
+  await context.route('https://content.dropboxapi.com/2/files/download', async route => {
+    const args = JSON.parse(route.request().headers()['dropbox-api-arg']);
+    if (args.path === path) { reached(); await held; }
+    await route.fallback();
+  });
+  await page.getByRole('button', { name: 'Import older Dropbox files' }).click();
+  await waiting;
+  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
+  await expect(page.getByRole('alert')).toContainText('Wait for the current Dropbox operation');
+  await expect(page.locator('#photo-cleanup-review')).toBeHidden();
+  release();
+  await expect(page.getByRole('alert')).toContainText('Older files imported');
+});
+
+test('honors cancellation while the confirmation sync is still in flight', async ({ page, context }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page); const name = await addTestPhoto(page); await connect(page);
+  await replaceEntry(page, 'Removed photo reference.'); await sync(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
+  await expect(page.locator('#photo-cleanup-summary')).toContainText('1 unused photo');
+  let release!: () => void, reached!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const waiting = new Promise<void>(resolve => { reached = resolve; });
+  let pause = true;
+  await context.route('https://api.dropboxapi.com/2/files/list_folder', async route => {
+    if (pause) { pause = false; reached(); await held; }
+    await route.fallback();
+  });
+  await page.getByRole('button', { name: 'Permanently delete photos' }).click();
+  await waiting;
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  release();
+  await expect(page.getByRole('button', { name: 'Clean up unused photos' })).toBeEnabled();
+  await expect(page.locator('#photo-cleanup-review')).toBeHidden();
+  expect(await storedPhotos(page)).toEqual([name]);
 });

@@ -28,16 +28,18 @@ export class PhotoUrls {
   version = 0;
   constructor(private local: LocalStore) {}
   async get(name: string): Promise<string | undefined> {
+    const version = this.version;
     const existing = this.urls.get(name);
     if (existing) return existing;
     const photo = await this.local.photo(name);
-    if (!photo) return;
+    if (!photo || version !== this.version) return;
     // Another thumbnail may have completed the same lookup while we awaited IDB.
     const url = this.urls.get(name) ?? URL.createObjectURL(photo);
     this.urls.set(name, url);
     return url;
   }
-  close(): void {
+  clear(): void {
+    this.version++;
     this.urls.forEach(url => URL.revokeObjectURL(url));
     this.urls.clear();
   }

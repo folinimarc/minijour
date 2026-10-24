@@ -13,6 +13,7 @@ minijour is an installable, offline-capable web app. It saves on your device fir
 - Lets you take or choose a photo and insert it at the cursor.
 - Displays one chronological page and exports one Markdown file with its photos.
 - Works offline after installation, with optional Dropbox sync when online.
+- Offers explicit cleanup of unused photos; removing a Markdown link alone preserves the image for undo.
 
 **Early development:** automated tests cover Chromium, including a mobile viewport. Real-device camera, keyboard, installation, and Dropbox sign-in still need verification. See [browser support and known limits](docs/user-guide.md#browser-support).
 

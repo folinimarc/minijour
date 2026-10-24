@@ -8,7 +8,10 @@ import type { mountShell } from './shell';
 /** Owns connection/unlock controls. Writing and local storage never depend on it. */
 export async function setupCloudSettings(
   ui: ReturnType<typeof mountShell>, journal: Journal,
-  options: { busy: () => boolean; change: (engine?: SyncEngine) => void; sync: () => Promise<void>; notify: (error: unknown) => void },
+  options: {
+    busy: () => boolean; activity: (value: boolean) => void;
+    change: (engine?: SyncEngine) => void; sync: () => Promise<void>; notify: (error: unknown) => void;
+  },
 ): Promise<void> {
   const local = journal.local;
   let cloud = await DropboxFiles.open(local);
@@ -16,6 +19,7 @@ export async function setupCloudSettings(
   let unlocked = false;
   let working = false;
   let inspected = false;
+  const setWorking = (value: boolean) => { working = value; options.activity(value); };
   const show = () => {
     ui.setup.hidden = !!cloud;
     ui.connected.hidden = !cloud;
@@ -72,7 +76,7 @@ export async function setupCloudSettings(
       guard();
       if (!cloud) return;
       if (!header && ui.password.value !== ui.passwordConfirm.value) throw new Error('The passwords do not match.');
-      working = true; show();
+      setWorking(true); show();
       try {
         // Re-inspect on every attempt: another device may have finished setup.
         const current = await EncryptedFiles.inspect(cloud);
@@ -84,42 +88,42 @@ export async function setupCloudSettings(
         await use(vault);
         ui.notice.hidden = true;
         await options.sync();
-      } finally { working = false; ui.password.value = ''; ui.passwordConfirm.value = ''; show(); }
+      } finally { setWorking(false); ui.password.value = ''; ui.passwordConfirm.value = ''; show(); }
     })().catch(options.notify);
   };
   ui.lock.onclick = () => { void (async () => {
     guard();
-    working = true;
+    setWorking(true);
     try {
       await local.removeSetting(VAULT_KEY_SETTING);
       unlocked = false; options.change();
-    } finally { working = false; show(); }
+    } finally { setWorking(false); show(); }
   })().catch(options.notify); };
   ui.disconnect.onclick = () => { void (async () => {
     guard();
-    working = true;
+    setWorking(true);
     try {
       await DropboxFiles.disconnect(local);
       cloud = undefined; header = undefined; unlocked = false; inspected = false;
       options.change(); ui.legacy.hidden = true;
-    } finally { working = false; show(); }
+    } finally { setWorking(false); show(); }
   })().catch(options.notify); };
   ui.importLegacy.onclick = () => { void (async () => {
     guard();
     if (!cloud || !unlocked) return;
-    working = true; show();
+    setWorking(true); show();
     try {
       await new SyncEngine(journal, cloud.legacy()).importOnly();
       await options.sync();
       options.notify('Older files imported. The unencrypted originals and their version history remain in Dropbox.');
-    } finally { working = false; show(); }
+    } finally { setWorking(false); show(); }
   })().catch(options.notify); };
   ui.sync.onclick = () => { void options.sync(); };
   const check = async () => {
     if (working) return;
-    working = true; show();
+    setWorking(true); show();
     try { await inspect(); } catch (error) { options.notify(error); }
-    finally { working = false; show(); }
+    finally { setWorking(false); show(); }
   };
   ui.checkCloud.onclick = () => { void check().then(options.sync); };
   window.addEventListener('online', () => {

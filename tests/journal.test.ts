@@ -6,7 +6,7 @@ import { LocalStore } from '../src/storage/local';
 import { exportJournal, importJournal } from '../src/storage/backup';
 import { SyncEngine } from '../src/sync/engine';
 import { DropboxFiles } from '../src/sync/dropbox';
-import type { CloudFiles, RemoteFile } from '../src/sync/cloud';
+import { MemoryCloud } from './helpers';
 
 const DATE = '2026-10-24';
 const stores: LocalStore[] = [];
@@ -24,30 +24,6 @@ afterEach(() => {
   journals.splice(0).forEach(journal => journal.close());
   stores.splice(0).forEach(store => store.close());
 });
-
-class MemoryCloud implements CloudFiles {
-  files = new Map<string, { bytes: Uint8Array; revision: string }>();
-  uploads = 0;
-  async create(path: string, bytes: Uint8Array): Promise<boolean> {
-    if (this.files.has(path)) return false;
-    await this.upload(path, bytes);
-    return true;
-  }
-  async list(): Promise<RemoteFile[]> {
-    return [...this.files].map(([path, file]) => ({ path, revision: file.revision }));
-  }
-  async download(path: string): Promise<Uint8Array> {
-    const file = this.files.get(path);
-    if (!file) throw new Error('Missing remote file');
-    return file.bytes.slice();
-  }
-  async upload(path: string, bytes: Uint8Array): Promise<RemoteFile> {
-    this.uploads++;
-    const revision = String(this.uploads);
-    this.files.set(path, { bytes: bytes.slice(), revision });
-    return { path, revision };
-  }
-}
 
 describe('Automerge journal model', () => {
   it('starts independently created days from identical history', () => {
@@ -205,6 +181,7 @@ it('exports a portable backup and restores history, photos, and offline changes'
   await original.edit(DATE, 'Original memory.');
   const name = `${crypto.randomUUID()}.jpg`;
   await original.local.savePhoto(name, new Blob(['photo'], { type: 'image/jpeg' }));
+  await original.edit(DATE, `Original memory. ![Photo](photos/${name})`);
   await original.local.setSetting('dropbox-connection', { accessToken: 'DO-NOT-EXPORT' });
   const backup = await exportJournal(original);
   const restored = await device();

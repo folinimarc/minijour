@@ -65,6 +65,7 @@ Automated tests mock Dropbox. Verify these steps with real accounts and devices:
 - Write offline, reconnect, and retrieve the text on another device.
 - Capture and choose a photo, then verify cross-device download.
 - Export and restore a backup in a separate browser profile.
+- Update all devices before using permanent photo cleanup. Test review/cancel, deletion sync, and reconnecting an offline device; older clients stop syncing when they encounter deletion records.
 - Install, reload offline, and update at the actual hosted subdirectory URL.
 - Check the on-screen keyboard and record browsers/devices tested.
 

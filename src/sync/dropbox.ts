@@ -133,8 +133,8 @@ export class DropboxFiles implements VaultStorage {
       const detail = await response.json().catch(() => ({}));
       if (response.status === 401) throw new Error('Dropbox access expired. Disconnect and reconnect in settings.');
       if (response.status === 429) throw new Error('Dropbox is busy. Your changes are saved locally; sync will retry.');
-      if (response.status === 409 && String(detail.error_summary).startsWith('path/not_found')) {
-        throw new MissingFolder();
+      if (response.status === 409 && /^(?:path|path_lookup)\/not_found/.test(String(detail.error_summary))) {
+        throw new MissingPath();
       }
       if (response.status === 409 && String(detail.error_summary).startsWith('path/conflict')) throw new FileExists();
       throw new Error(`Dropbox could not complete the request (${response.status}). Your local journal is safe.`);
@@ -147,7 +147,7 @@ export class DropboxFiles implements VaultStorage {
     try {
       page = await (await this.request('files/list_folder', { path: this.root, recursive: true, include_deleted: false })).json();
     } catch (error) {
-      if (error instanceof MissingFolder) return [];
+      if (error instanceof MissingPath) return [];
       throw error;
     }
     const files: RemoteFile[] = [];
@@ -183,7 +183,12 @@ export class DropboxFiles implements VaultStorage {
       throw error;
     }
   }
+
+  async remove(path: string): Promise<void> {
+    try { await this.request('files/delete_v2', { path: this.root + path }); }
+    catch (error) { if (!(error instanceof MissingPath)) throw error; }
+  }
 }
 
-class MissingFolder extends Error {}
+class MissingPath extends Error {}
 class FileExists extends Error {}
