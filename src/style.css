@@ -65,7 +65,7 @@ dialog::backdrop { background: #30382d35; backdrop-filter: blur(3px); }
 .settings-section .help { font-size: 11px; line-height: 1.7; margin: 10px 0 16px; }
 .help code { font-size: 10px; overflow-wrap: anywhere; }
 label { display: block; font-size: 12px; margin: 14px 0 7px; }
-input[type=text], input[readonly] { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 11px; font-size: 13px; background: var(--paper); color: var(--ink); }
+input[type=text], input[type=password], input[readonly] { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 11px; font-size: 13px; background: var(--paper); color: var(--ink); }
 input[readonly] { font-size: 11px; }
 .button-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .primary-button, .secondary-button, .text-button { padding: 11px 15px; font-size: 12px; border-radius: 7px; border: 1px solid transparent; }
@@ -92,3 +92,6 @@ input[readonly] { font-size: 11px; }
   .dialog-header h1 { font-size: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+
+.checkbox-label { display: flex; align-items: center; gap: 8px; line-height: 1.5; }
+.checkbox-label input { margin: 0; flex-shrink: 0; }

@@ -6,6 +6,9 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Added
 
+- Password-protected Dropbox sync with Argon2id and AES-GCM encryption of text, editing history, photos, and filenames.
+- Optional remembered device keys, cloud locking, and explicit import of older unencrypted Dropbox data.
+
 - An offline-capable Markdown journal with automatic daily sections and photos at the cursor.
 - Local persistence, Automerge merging, and optional personal Dropbox sync.
 - Portable Markdown/photo backups with lossless restore of editing history.

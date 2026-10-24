@@ -1,3 +1,5 @@
+import * as A from '@automerge/automerge';
+import { createDay, editDay } from '../../src/domain/day';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 async function openJournal(page: Page) {
@@ -141,16 +143,20 @@ class DropboxMock {
       const args = JSON.parse(request.headers()['dropbox-api-arg'] || request.postData() || '{}');
       if (endpoint.endsWith('/list_folder')) {
         await route.fulfill({ json: {
-          entries: [...this.files].map(([path, file]) => ({ '.tag': 'file', path_lower: `/minijour-v1${path}`, rev: file.revision })),
+          entries: [...this.files].filter(([path]) => path.startsWith(args.path + '/')).map(([path, file]) => ({ '.tag': 'file', path_lower: path, rev: file.revision })),
           cursor: 'cursor', has_more: false,
         } });
       } else if (endpoint.endsWith('/upload')) {
-        const path = args.path.replace('/minijour-v1', '');
+        const path = args.path;
+        if (args.mode === 'add' && this.files.has(path)) {
+          await route.fulfill({ status: 409, json: { error_summary: 'path/conflict/file' } });
+          return;
+        }
         const revision = String(++this.revision);
         this.files.set(path, { bytes: request.postDataBuffer()!, revision });
         await route.fulfill({ json: { rev: revision } });
       } else if (endpoint.endsWith('/download')) {
-        const file = this.files.get(args.path.replace('/minijour-v1', ''));
+        const file = this.files.get(args.path);
         await route.fulfill({ body: file!.bytes, contentType: 'application/octet-stream' });
       } else await route.fulfill({ status: 400 });
     });
@@ -162,7 +168,18 @@ async function connect(page: Page) {
   const appKey = page.getByLabel('Dropbox app key', { exact: true });
   if (await appKey.isVisible()) await appKey.fill('testkey');
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
+  await unlock(page);
+}
+
+const PASSWORD = 'three random words for testing';
+async function unlock(page: Page, remember = true) {
+  await page.getByLabel('Cloud password', { exact: true }).fill(PASSWORD);
+  const confirmation = page.getByLabel('Repeat cloud password');
+  if (await confirmation.isVisible()) await confirmation.fill(PASSWORD);
+  await page.getByLabel('Remember the key on this device').setChecked(remember);
+  await page.locator('#unlock-button').click();
   await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
+  await page.getByRole('button', { name: 'Close settings' }).click();
 }
 
 async function sync(page: Page) {
@@ -217,7 +234,7 @@ test('configured deployments hide developer setup and use the shared public app 
   const authorization = page.waitForRequest(request => request.url().startsWith('https://www.dropbox.com/oauth2/authorize?'));
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
   expect(new URL((await authorization).url()).searchParams.get('client_id')).toBe(process.env.VITE_DROPBOX_APP_KEY);
-  await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
+  await unlock(page);
 });
 
 test('blocks a different Dropbox account without sending it any journal data', async ({ page, context }) => {
@@ -255,4 +272,82 @@ test('identifies the version and serves licensing beside the installed app', asy
   const notices = await request.get(new URL('THIRD_PARTY_NOTICES.txt', baseURL!).href);
   expect(notices.ok()).toBe(true);
   expect(await notices.text()).toContain('@automerge/automerge@');
+});
+
+test('keeps cloud locked after reload unless remembering was requested, and never uploads after a wrong password', async ({ page, context }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page); await page.keyboard.insertText('Private memory.');
+  await connect(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Lock cloud', exact: true }).click();
+  await expect(page.getByLabel('Cloud password', { exact: true })).toBeVisible();
+  await page.getByLabel('Cloud password', { exact: true }).fill('incorrect password');
+  const writes = mock.revision;
+  await page.getByRole('button', { name: 'Unlock cloud', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Could not unlock');
+  expect(mock.revision).toBe(writes);
+  await unlock(page, false);
+  await page.reload();
+  await expect(page.locator('.cm-content')).toContainText('Private memory.');
+  await page.keyboard.press('End'); await page.keyboard.insertText(' Local writing still works.');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  expect(mock.revision).toBe(writes);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await expect(page.getByRole('button', { name: 'Unlock cloud', exact: true })).toBeVisible();
+  await unlock(page, true);
+  await page.reload();
+  await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
+  for (const [path, file] of mock.files) {
+    expect(path).not.toContain('2026-10-24');
+    expect(path).not.toContain('photos');
+    expect(file.bytes.toString()).not.toContain('Private memory.');
+    expect(file.bytes.toString()).not.toContain(PASSWORD);
+  }
+});
+
+test('requires matching passwords on setup and keeps local writing available after interrupted cloud checks', async ({ page, context }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  const appKey = page.getByLabel('Dropbox app key', { exact: true });
+  if (await appKey.isVisible()) await appKey.fill('testkey');
+  await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
+  await page.getByLabel('Cloud password', { exact: true }).fill(PASSWORD);
+  await page.getByLabel('Repeat cloud password').fill('different password');
+  await page.getByRole('button', { name: 'Enable encrypted sync', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('do not match');
+  expect(mock.files.size).toBe(0);
+  await unlock(page);
+  // Abort the network at the boundary rather than mock the storage/crypto code.
+  await context.route(/https:\/\/(api|content)\.dropboxapi\.com\/2\//, route => route.abort());
+  await page.reload();
+  await expect(page.locator('.cm-content')).toBeFocused();
+  await page.keyboard.insertText('Writing while cloud access is unavailable.');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await page.getByRole('button', { name: 'Add a photo', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Choose from device' })).toBeVisible();
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await expect(page.getByRole('button', { name: 'Check Dropbox' })).toBeVisible();
+});
+
+
+test('imports older plaintext Dropbox entries and photos explicitly without modifying their originals', async ({ page, context }) => {
+  const mock = new DropboxMock();
+  const photo = `${crypto.randomUUID()}.jpg`;
+  const path = `/minijour-v1/days/2020-01-01/${crypto.randomUUID()}.automerge`;
+  const original = Buffer.from(A.save(editDay(createDay('2020-01-01'), `Older private memory. ![Photo](photos/${photo})`)));
+  mock.files.set(path, { bytes: original, revision: 'old' });
+  mock.files.set(`/minijour-v1/photos/${photo}`, { bytes: Buffer.from('older photo'), revision: 'old-photo' });
+  await mock.install(context);
+  await openJournal(page); await connect(page);
+  await expect(page.locator('.cm-content')).not.toContainText('Older private memory.');
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await expect(page.locator('#legacy-cloud')).toContainText('unencrypted files still exist');
+  await page.getByRole('button', { name: 'Import older Dropbox files' }).click();
+  await expect(page.getByRole('alert')).toContainText('Older files imported');
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await expect(page.locator('.cm-content').first()).toContainText('Older private memory.');
+  expect(mock.files.get(path)!.bytes).toEqual(original);
+  expect([...mock.files.keys()].filter(name => name.startsWith('/minijour-v1/'))).toHaveLength(2);
+  expect([...mock.files.keys()].some(name => name.startsWith('/minijour-encrypted-v1/objects/'))).toBe(true);
 });

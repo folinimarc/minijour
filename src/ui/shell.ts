@@ -33,7 +33,7 @@ export function mountShell() {
     <div id="notice" class="notice" role="alert" hidden><span id="notice-text"></span><button id="dismiss-notice" class="icon-button" aria-label="Dismiss message">${icon('close')}</button></div>
     <button id="update-button" class="update-button" hidden>Update ready · reload</button>
     <dialog id="settings-dialog" aria-labelledby="settings-title">
-      <div class="dialog-header"><h1 id="settings-title">A little housekeeping.</h1><button id="close-settings" class="icon-button" aria-label="Close settings">${icon('close')}</button></div>
+      <div class="dialog-header"><h1 id="settings-title">Settings</h1><button id="close-settings" class="icon-button" aria-label="Close settings">${icon('close')}</button></div>
       <section class="settings-section">
         <h2>${icon('cloud')}Dropbox sync</h2>
         <p id="connection-description">Your journal saves on this device. Connect Dropbox to keep writing across devices.</p>
@@ -50,17 +50,33 @@ export function mountShell() {
         </div>
         <div id="dropbox-connected" class="button-row" hidden>
           <button id="sync-button" class="primary-button">Sync now</button>
+          <button id="lock-button" class="secondary-button">Lock cloud</button>
           <button id="disconnect-button" class="secondary-button">Disconnect</button>
         </div>
-        <p class="help">Sync runs while the app is open. Dropbox stores your journal in your app folder; additional end-to-end encryption is not enabled.</p>
+        <form id="vault-form" hidden>
+          <p id="vault-description"></p>
+          <label for="cloud-password">Cloud password</label>
+          <input id="cloud-password" type="password" autocomplete="current-password" required />
+          <div id="password-confirmation"><label for="cloud-password-confirm">Repeat cloud password</label>
+          <input id="cloud-password-confirm" type="password" autocomplete="new-password" /></div>
+          <label class="checkbox-label"><input id="remember-cloud" type="checkbox" /> Remember the key on this device</label>
+          <p class="help">Keep your password somewhere safe. There is no password reset. Your local journal and downloaded backups are not encrypted by minijour.</p>
+          <button id="unlock-button" class="primary-button" type="submit">Unlock cloud</button>
+        </form>
+        <button id="check-cloud-button" class="secondary-button" hidden>Check Dropbox</button>
+        <div id="legacy-cloud" hidden>
+          <p class="help">Older, unencrypted files still exist in your Dropbox app folder under <code>minijour-v1</code>. Import them to include entries from other devices. Importing leaves those files and Dropbox version history in place; remove old copies separately in Dropbox if needed.</p>
+          <button id="import-legacy-button" class="secondary-button">Import older Dropbox files</button>
+        </div>
+        <p class="help">Text, editing history, and photos are encrypted on this device before upload. Dropbox can still see file sizes and upload times. Sync runs while the app is open and cloud access is unlocked.</p>
       </section>
       <section class="settings-section">
-        <h2>Your words, yours to keep</h2>
-        <p>Download your Markdown, photos, and editing history together. Restoring a backup combines entries with this journal.</p>
+        <h2>Download and restore</h2>
+        <p>Download your Markdown, photos, and editing history as an unencrypted ZIP. Restoring a backup combines entries with this journal.</p>
         <div class="button-row"><button id="export-button" class="secondary-button">Download backup</button><button id="restore-button" class="text-button">Restore backup</button></div>
       </section>
       <section class="settings-section settings-small">
-        <h2>Keep it close</h2>
+        <h2>Install</h2>
         <p>Install from your browser’s menu, or choose <strong>Add to Home Screen</strong> from the Share menu. After the first visit and offline installation, you can write without a connection.</p>
         <button id="install-button" class="secondary-button" hidden>Install minijour</button>
         <p class="help">Dates follow your device’s local time. Day headings are automatic. Without Dropbox or an exported backup, clearing browser data removes your journal.</p>
@@ -86,6 +102,12 @@ export function mountShell() {
     sync: get<HTMLButtonElement>('sync-button'), export: get<HTMLButtonElement>('export-button'),
     restore: get<HTMLButtonElement>('restore-button'), setup: get<HTMLDivElement>('dropbox-setup'),
     developerSetup: get<HTMLDivElement>('dropbox-developer-setup'),
+    vaultForm: get<HTMLFormElement>('vault-form'), vaultDescription: get<HTMLParagraphElement>('vault-description'),
+    password: get<HTMLInputElement>('cloud-password'), passwordConfirm: get<HTMLInputElement>('cloud-password-confirm'),
+    confirmation: get<HTMLDivElement>('password-confirmation'), remember: get<HTMLInputElement>('remember-cloud'),
+    unlock: get<HTMLButtonElement>('unlock-button'), lock: get<HTMLButtonElement>('lock-button'),
+    checkCloud: get<HTMLButtonElement>('check-cloud-button'),
+    legacy: get<HTMLDivElement>('legacy-cloud'), importLegacy: get<HTMLButtonElement>('import-legacy-button'),
     connected: get<HTMLDivElement>('dropbox-connected'), connectionDescription: get<HTMLParagraphElement>('connection-description'),
     install: get<HTMLButtonElement>('install-button'), update: get<HTMLButtonElement>('update-button'),
   };

@@ -6,3 +6,8 @@ export interface CloudFiles {
   download(path: string): Promise<Uint8Array>;
   upload(path: string, bytes: Uint8Array): Promise<RemoteFile>;
 }
+
+export interface VaultStorage extends CloudFiles {
+  /** Atomic create: false means another device already created this path. */
+  create(path: string, bytes: Uint8Array): Promise<boolean>;
+}

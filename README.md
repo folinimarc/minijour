@@ -2,7 +2,7 @@
 
 A small journal: open it, write Markdown, add a photo. Each new day appears below the last.
 
-minijour is an installable, offline-capable web app. It saves on your device first. Optional Dropbox sync combines edits across devices with [Automerge](https://automerge.org/). Each person connects their own Dropbox account. No minijour account or application server is required.
+minijour is an installable, offline-capable web app. It saves on your device first. Optional encrypted Dropbox sync combines edits across devices with [Automerge](https://automerge.org/). Each person connects their own Dropbox account. No minijour account or application server is required.
 
 <img src="docs/images/journal.png" width="320" alt="minijour showing a date heading and a short Markdown journal entry" />
 
@@ -30,7 +30,7 @@ For installation and offline testing, run `npm run build` followed by `npm run p
 
 The journal lives in your browser's local database and, if connected, your personal Dropbox app folder. Without Dropbox or an exported backup, clearing browser data or losing the device loses the journal.
 
-No analytics or third-party fonts are included. Dropbox tokens stay on your device and are excluded from backups. Additional end-to-end encryption is not enabled. [Read about storage, privacy, and backups](docs/user-guide.md#storage-and-privacy).
+No analytics or third-party fonts are included. Dropbox tokens stay on your device and are excluded from backups. Cloud text, editing history, photos, and filenames are encrypted on your device using your cloud password. The local database and downloaded ZIP backups are unencrypted. [Read about storage, privacy, and backups](docs/user-guide.md#storage-and-privacy).
 
 ## Documentation
 

@@ -30,14 +30,17 @@ src/
   domain/
     day.ts            Date helpers and Automerge document operations
     journal.ts        In-memory journal, durable saves, change notifications
+  crypto/
+    vault.ts          Password wrapping, encryption, and encrypted file adapter
   storage/
     local.ts          IndexedDB access, including safe saves from multiple tabs
     backup.ts         Portable ZIP export and lossless backup restore
   sync/
-    cloud.ts          The three operations a cloud backend needs to provide
+    cloud.ts          File contract, plus atomic create for vault storage
     dropbox.ts        Dropbox OAuth and API requests
     engine.ts         Pull, Automerge merge, and push
   ui/
+    cloud-settings.ts Connection, password unlock, and legacy import controls
     shell.ts          Static application markup and element references
     editor.ts         CodeMirror editor and photo previews
     photos.ts         Image resizing and local display URLs
@@ -50,7 +53,7 @@ If you're learning, follow this path:
 2. Read `storage/local.ts` to see how data survives closing the page.
 3. Follow a keystroke from `ui/editor.ts` through `main.ts` to `Journal.merge()`.
 4. Read `sync/cloud.ts`, then `sync/engine.ts`. The engine doesn't know about HTTP or OAuth.
-5. Read `sync/dropbox.ts` to see how those three operations map to an external service.
+5. Read `crypto/vault.ts`, which wraps that file contract with encryption, then `sync/dropbox.ts` for HTTP/OAuth. Encryption stays outside the document and merge logic.
 
 ### The data model
 
@@ -64,17 +67,16 @@ IndexedDB saves merge inside a read/write transaction. That protects against two
 
 ### Dropbox file layout
 
-Inside the Dropbox app folder:
+The sync engine works with logical paths `/days/YYYY-MM-DD/<writer-id>.automerge` and `/photos/<photo-id>.jpg`. `EncryptedFiles` translates these before Dropbox receives anything:
 
 ```text
-minijour-v1/
-  days/
-    2026-10-24/
-      <writer-id>.automerge
-      <another-writer-id>.automerge
-  photos/
-    <photo-id>.jpg
+minijour-encrypted-v1/
+  vault.json               Public format version, vault ID, salt, wrapped key
+  objects/
+    <encrypted-name>.bin   Encrypted document or photo
 ```
+
+The older `minijour-v1/` folder is read only through an explicit import action. No new plaintext files are uploaded there, and importing never deletes or rewrites it. Older app versions still use that folder: update all devices to the encrypted version before continuing cross-device editing.
 
 A writer ID is unique to each running app instance. It owns one checkpoint per day it changes. Checkpoints contain Automerge history, so other devices can combine them later even when the original writer is offline. One writer never overwrites another's file. A fresh app compares the merged remote heads with its local heads and uploads only days containing additional changes.
 
@@ -83,6 +85,18 @@ The engine lists checkpoints, downloads new revisions, merges them locally, tran
 Sync runs after edits settle, on opening/returning online, and every 30 seconds while visible. If edits arrive during a sync, another round follows. **It cannot guarantee uploads while the app is closed or suspended.** Check the saved status before switching devices if you need the latest edit immediately.
 
 We retain checkpoints and photos rather than implementing destructive remote garbage collection. Storage grows with editing history and app sessions; old snapshots aren't automatically deleted. A fresh device initially downloads the available checkpoints and photos; later polls cache unchanged checkpoint revisions in memory. These are deliberate simplicity tradeoffs, and the first areas to revisit for very large journals.
+
+### Encryption format
+
+`crypto/vault.ts` contains the versioned format. Argon2id v1.3 (`hash-wasm`) uses a random 16-byte salt, 64 MiB of memory, three iterations, one lane, and a 32-byte output. Version 1 fixes these parameters so untrusted metadata cannot request unbounded KDF work. See the [library documentation](https://github.com/Daninet/hash-wasm) and [Argon2 specification](https://www.rfc-editor.org/rfc/rfc9106).
+
+The password-derived AES key encrypts a random 32-byte journal key. All AES-GCM operations use fresh random 12-byte IVs and 128-bit authentication tags. Additional authenticated data binds the format version, vault ID, and purpose. Key wrapping also binds the salt; content encryption binds the full opaque cloud path. Each binary envelope is `IV || ciphertext || tag`.
+
+Filenames are AES-GCM-encrypted logical paths encoded in lowercase hex, so Dropbox's lowercased listing preserves them. Their authentication context differs from file contents. Listing decrypts names without downloading every photo. Concurrent copies of an immutable photo use the first opaque path in sorted order; per-instance day writer IDs prevent document collisions. No manifest is rewritten on each edit.
+
+The public `vault.json` contains `{ version, id, salt, wrappedKey }`. Atomic create-if-absent ensures simultaneous setup cannot replace another device's key. A lost response is retried against the existing header. Missing/damaged headers, wrong passwords, and authentication failures stop sync; they never trigger plaintext fallback. Keep the header with the ciphertext: neither is usable alone.
+
+The unwrapped key is non-exportable in Web Crypto. Optional remember-on-device stores that CryptoKey by IndexedDB structured cloning, bound to the exact vault descriptor; it never stores the password. Settings and keys are excluded from ZIP backups. Local data remains plaintext. This implementation has automated regression coverage, not an independent cryptographic security audit. It trusts the served JavaScript and does not prevent cloud deletion or replay of old valid ciphertext.
 
 ### Photos and backups
 
@@ -115,7 +129,7 @@ npm run test:browser
 npm run build
 ```
 
-Unit tests cover independent day creation, text convergence, concurrent local saves, cursor anchors with emoji, offline sync, failed uploads, photo transfer, and backup restore. Browser tests exercise the production build: focus and persistence, photo insertion, offline reloads, midnight rollover, multiple tabs, restore, and Dropbox authorization/sync across two simulated devices.
+Unit tests cover encryption round trips, authentication failures, concurrent vault setup, remembered keys, legacy import, and independent day creation, text convergence, concurrent local saves, cursor anchors with emoji, offline sync, failed uploads, photo transfer, and backup restore. Browser tests exercise the production build: focus and persistence, photo insertion, offline reloads, midnight rollover, multiple tabs, restore, and Dropbox authorization/sync across two simulated devices.
 
 Dropbox browser tests mock the network boundary. A real Dropbox app/account and the actual mobile camera/keyboard still need a device smoke test before relying on the app for irreplaceable entries.
 

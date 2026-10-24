@@ -17,7 +17,7 @@ type FolderPage = { entries: FileEntry[]; cursor: string; has_more: boolean };
 
 const CONNECTION = 'dropbox-connection';
 const OAUTH = 'minijour-oauth';
-const ROOT = '/minijour-v1';
+const ROOT = '/minijour-encrypted-v1';
 
 function base64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
@@ -80,7 +80,9 @@ export async function finishDropboxConnection(local: LocalStore): Promise<boolea
 /** A thin Dropbox API adapter. Dropbox stores bytes; Automerge merges them. */
 export class DropboxFiles implements CloudFiles {
   private refreshing?: Promise<void>;
-  private constructor(private local: LocalStore, private connection: Connection) {}
+  private constructor(private local: LocalStore, private connection: Connection, private root = ROOT) {}
+
+  legacy(): DropboxFiles { return new DropboxFiles(this.local, this.connection, '/minijour-v1'); }
 
   static async open(local: LocalStore): Promise<DropboxFiles | undefined> {
     const connection = await local.setting<Connection>(CONNECTION);
@@ -133,6 +135,7 @@ export class DropboxFiles implements CloudFiles {
       if (response.status === 409 && String(detail.error_summary).startsWith('path/not_found')) {
         throw new MissingFolder();
       }
+      if (response.status === 409 && String(detail.error_summary).startsWith('path/conflict')) throw new FileExists();
       throw new Error(`Dropbox could not complete the request (${response.status}). Your local journal is safe.`);
     }
     return response;
@@ -141,7 +144,7 @@ export class DropboxFiles implements CloudFiles {
   async list(): Promise<RemoteFile[]> {
     let page: FolderPage;
     try {
-      page = await (await this.request('files/list_folder', { path: ROOT, recursive: true, include_deleted: false })).json();
+      page = await (await this.request('files/list_folder', { path: this.root, recursive: true, include_deleted: false })).json();
     } catch (error) {
       if (error instanceof MissingFolder) return [];
       throw error;
@@ -149,7 +152,7 @@ export class DropboxFiles implements CloudFiles {
     const files: RemoteFile[] = [];
     while (true) {
       for (const entry of page.entries) {
-        if (entry['.tag'] === 'file') files.push({ path: entry.path_lower.slice(ROOT.length), revision: entry.rev });
+        if (entry['.tag'] === 'file') files.push({ path: entry.path_lower.slice(this.root.length), revision: entry.rev });
       }
       if (!page.has_more) return files;
       page = await (await this.request('files/list_folder/continue', { cursor: page.cursor })).json();
@@ -157,16 +160,29 @@ export class DropboxFiles implements CloudFiles {
   }
 
   async download(path: string): Promise<Uint8Array> {
-    return new Uint8Array(await (await this.request('files/download', { path: ROOT + path })).arrayBuffer());
+    return new Uint8Array(await (await this.request('files/download', { path: this.root + path })).arrayBuffer());
   }
 
   async upload(path: string, bytes: Uint8Array): Promise<RemoteFile> {
     // Every open app has a unique writer path. Only that writer updates it.
     const result = await (await this.request('files/upload', {
-      path: ROOT + path, mode: 'overwrite', autorename: false, mute: true,
+      path: this.root + path, mode: 'overwrite', autorename: false, mute: true,
     }, bytes)).json() as { rev: string };
     return { path, revision: result.rev };
+  }
+
+  async create(path: string, bytes: Uint8Array): Promise<boolean> {
+    try {
+      await this.request('files/upload', {
+        path: this.root + path, mode: 'add', autorename: false, strict_conflict: true, mute: true,
+      }, bytes);
+      return true;
+    } catch (error) {
+      if (error instanceof FileExists) return false;
+      throw error;
+    }
   }
 }
 
 class MissingFolder extends Error {}
+class FileExists extends Error {}

@@ -16,7 +16,7 @@ Register one app in the [Dropbox App Console](https://www.dropbox.com/developers
 
 The app key is public and included in the browser build. Never put an app secret, access token, or refresh token in a `VITE_` variable. Authorization uses code flow with SHA-256 PKCE and state validation. Tokens stay on the authorizing device and refresh automatically.
 
-With a configured key, visitors should only need **Connect Dropbox**. Builds without a key expose manual configuration for self-hosting and development. Use the same app key and Dropbox account on devices that should share a journal.
+With a configured key, visitors choose **Connect Dropbox**, then create or enter their cloud password. Builds without a key expose manual configuration for self-hosting and development. Use the same app key and Dropbox account on devices that should share a journal.
 
 Dropbox permits HTTP OAuth redirects for `localhost`, for example `http://localhost:5173/`. Use HTTPS on actual devices: HTTP LAN addresses do not provide the secure context required by installation and other browser APIs.
 
@@ -28,6 +28,8 @@ npm run build
 ```
 
 Publish `dist/`. Keep a stable origin and path: browser storage belongs to the origin and Dropbox checks redirect URIs exactly. Relative asset URLs support subdirectory hosting. Keep license notices and corresponding source available when distributing builds; see the [release guide](releasing.md).
+
+Encrypted sync is browser-to-Dropbox; the website host does not hold passwords or journal keys. Keep deployments trustworthy: anyone controlling the served JavaScript could read unlocked data. Update all devices together when moving from the legacy plaintext cloud format; old builds keep writing to the old folder.
 
 The service worker caches app assets including Automerge's WebAssembly, not Dropbox requests or journal data. Updates wait for the user to choose reload after pending local edits save.
 

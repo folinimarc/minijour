@@ -23,6 +23,9 @@ export class SyncEngine {
     private writer = crypto.randomUUID(),
   ) {}
 
+  /** Import an older plaintext cloud copy without ever writing back to it. */
+  async importOnly(): Promise<void> { await this.round(false); }
+
   sync(): Promise<void> {
     if (this.running) {
       this.rerun = true;
@@ -37,7 +40,7 @@ export class SyncEngine {
     return this.running;
   }
 
-  private async round(): Promise<void> {
+  private async round(upload = true): Promise<void> {
     const files = await this.cloud.list();
     const remoteDays = new Map<string, DayDoc>();
 
@@ -63,6 +66,7 @@ export class SyncEngine {
       photosChanged = true;
     }
     if (photosChanged) this.journal.photosChanged();
+    if (!upload) return;
 
     // Upload photos before documents that might reference them. Photos have
     // unique immutable names and do not need CRDT merging.

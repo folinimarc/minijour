@@ -22,21 +22,31 @@ The app focuses the editor on opening. Browsers control whether that raises the 
 
 ## Connect your Dropbox
 
-On a configured deployment, choose **Connect Dropbox**, sign in to your own Dropbox account, and authorize minijour. You do not need a Dropbox developer account. On another device, visit the same site and connect the same Dropbox account.
+On a configured deployment, choose **Connect Dropbox**, sign in to your own Dropbox account, and authorize minijour. Choose a cloud password of at least 12 characters, or enter your existing cloud password. You do not need a Dropbox developer account. On another device, visit the same site and connect the same Dropbox account and unlock with the same cloud password.
 
 If you see app-key setup fields, the deployment has not configured its Dropbox integration. Its operator can follow the [deployment guide](deployment.md#configure-dropbox). Developer configuration is separate from signing into personal Dropbox storage.
 
-The first connection combines local entries with the journal in your Dropbox app folder. Sync runs after edits settle, when opening/returning online, and every 30 seconds while visible. Check the saved status before switching devices if you need your latest edit immediately. Uploads cannot be guaranteed while the app is closed or suspended.
+Unlocking combines local entries with the journal in your Dropbox app folder. Sync runs after edits settle, when opening/returning online, and every 30 seconds while visible. Check the saved status before switching devices if you need your latest edit immediately. Uploads cannot be guaranteed while the app is closed or suspended.
+
+The password is never sent to Dropbox. There is no password reset: store it safely. A few random words make a useful passphrase. A forgotten password cannot recover the cloud copy; a device with a usable local copy can still export its journal.
+
+**Remember the key on this device** saves a non-exportable encryption key in the browser database. Otherwise, reopening requires the cloud password to resume sync. Writing locally works while cloud access is locked. **Lock cloud** forgets the saved key and stops cloud sync in the current tab; other open tabs retain their own unlocked sessions. **Disconnect** also removes this device's Dropbox connection.
+
+If the app finds files from an older, unencrypted version, settings shows **Import older Dropbox files**. This explicitly copies missing entries and photos into the current journal, then syncs them encrypted. It leaves the older files and Dropbox version history in place. Remove those separately in Dropbox if needed; encryption cannot retroactively protect copies already uploaded.
 
 Disconnecting preserves local and remote entries. The journal remains bound to that Dropbox account and application; reconnecting a different account is blocked before any journal data transfers. Use separate browser profiles for separate accounts.
 
 ## Storage and privacy
 
 - **On the device:** IndexedDB holds text, photos, settings, and the Dropbox connection. Browser profiles have separate local storage.
-- **In Dropbox, when connected:** Automerge documents and photos live in your own app folder. Other users have independent folders in their accounts.
+- **In Dropbox, when connected:** Encrypted Automerge documents and photos live in your own app folder. Other users have independent folders in their accounts.
 - **On the website host:** the host serves application files. The app does not upload journals or Dropbox tokens to a minijour server. Hosting providers may keep normal access logs. The browser communicates directly with Dropbox.
 
-There is no analytics, advertising, external font loading, or additional end-to-end encryption. You trust the code served by the website you use. Tokens stay on the device and are excluded from backups. You can revoke authorization in your Dropbox account settings.
+Cloud files and their names are encrypted before upload with AES-256-GCM. Argon2id derives a wrapping key from the cloud password; that key unlocks a randomly generated journal key. Dropbox can see file sizes and upload times, and can delete or replay older encrypted files. Encryption detects altered ciphertext but cannot guarantee availability or detect every rollback.
+
+The local database and exported backups are **not encrypted by minijour**. A remembered key permits cloud decryption on that browser profile. Use your device lock and protect downloaded backups.
+
+There is no analytics, advertising, or external font loading. You trust the code served by the website you use. Tokens stay on the device and are excluded from backups. You can revoke authorization in your Dropbox account settings.
 
 Without Dropbox or an exported backup, clearing browser data or losing the device loses the journal. The app requests persistent storage after your first edit, but permission can be denied. If a local save fails, pending edits remain in memory: download a backup before closing.
 

@@ -6,7 +6,8 @@ import { localDate } from './domain/day';
 import { Journal } from './domain/journal';
 import { LocalStore } from './storage/local';
 import { exportJournal, importJournal } from './storage/backup';
-import { connectDropbox, DropboxFiles, finishDropboxConnection, redirectUri } from './sync/dropbox';
+import { finishDropboxConnection } from './sync/dropbox';
+import { setupCloudSettings } from './ui/cloud-settings';
 import { SyncEngine } from './sync/engine';
 import { DayEditor } from './ui/editor';
 import { PhotoUrls, preparePhoto } from './ui/photos';
@@ -39,9 +40,8 @@ async function start(): Promise<void> {
   let requestPersistent = false;
 
   await journal.load();
-  try { await finishDropboxConnection(local); } catch (error) { notify(error); }
-  const cloud = await DropboxFiles.open(local);
-  if (cloud) engine = new SyncEngine(journal, cloud);
+  let justConnected = false;
+  try { justConnected = await finishDropboxConnection(local); } catch (error) { notify(error); }
 
   function updateStatus(): void {
     ui.status.classList.toggle('has-error', !!journal.saveError || syncError);
@@ -154,31 +154,6 @@ async function start(): Promise<void> {
     if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) ui.dialog.close();
   } });
   ui.dialog.addEventListener('close', () => { document.body.append(ui.notice); editors.get(activeDate)?.view.focus(); });
-  ui.appKey.value = import.meta.env.VITE_DROPBOX_APP_KEY || await local.setting<string>('dropbox-app-key') || '';
-  ui.developerSetup.hidden = !!import.meta.env.VITE_DROPBOX_APP_KEY;
-  ui.redirect.value = redirectUri();
-  ui.setup.hidden = !!engine;
-  ui.connected.hidden = !engine;
-  if (engine) ui.connectionDescription.textContent = 'Connected. Your text and photos sync with Dropbox while minijour is open.';
-
-  ui.connect.onclick = () => { void (async () => {
-    ui.connect.disabled = true;
-    await journal.flush();
-    await local.setSetting('dropbox-app-key', ui.appKey.value.trim());
-    await connectDropbox(ui.appKey.value);
-  })().catch(error => { ui.connect.disabled = false; notify(error); }); };
-
-  ui.disconnect.onclick = () => { void (async () => {
-    if (syncing) throw new Error('Wait for the current sync to finish before disconnecting.');
-    clearTimeout(syncTimer);
-    await DropboxFiles.disconnect(local);
-    engine = undefined; syncError = false; lastSync = undefined;
-    ui.setup.hidden = false; ui.connected.hidden = true;
-    ui.connectionDescription.textContent = 'Disconnected. Your journal stays on this device and in Dropbox. Reconnect the same account to resume sync.';
-    updateStatus();
-  })().catch(notify); };
-  ui.sync.onclick = () => { void sync(); };
-
   ui.export.onclick = () => { void (async () => {
     ui.export.disabled = true;
     try {
@@ -262,7 +237,6 @@ async function start(): Promise<void> {
     if (journal.pending || journal.saveError) { event.preventDefault(); event.returnValue = ''; }
   });
   setInterval(() => { if (document.visibilityState === 'visible') void sync(); }, 30_000);
-  void sync();
 
   // Updates wait for a reload: replacing an open editor while typing is unsafe.
   const updateSW = registerSW({ onNeedRefresh() { ui.update.hidden = false; }, onRegisterError: () => {
@@ -276,6 +250,18 @@ async function start(): Promise<void> {
     ui.install.hidden = false;
     ui.install.onclick = () => { void install.prompt().then(() => install.userChoice).then(() => { ui.install.hidden = true; }); };
   });
+  await setupCloudSettings(ui, journal, {
+    busy: () => syncing,
+    change: next => {
+      clearTimeout(syncTimer);
+      engine = next; syncError = false; lastSync = undefined; dirty = true;
+      updateStatus();
+    },
+    sync, notify,
+  });
+  if (justConnected) ui.settingsButton.click();
+
+  void sync();
 }
 
 void start().catch(error => {

@@ -28,6 +28,11 @@ afterEach(() => {
 class MemoryCloud implements CloudFiles {
   files = new Map<string, { bytes: Uint8Array; revision: string }>();
   uploads = 0;
+  async create(path: string, bytes: Uint8Array): Promise<boolean> {
+    if (this.files.has(path)) return false;
+    await this.upload(path, bytes);
+    return true;
+  }
   async list(): Promise<RemoteFile[]> {
     return [...this.files].map(([path, file]) => ({ path, revision: file.revision }));
   }
