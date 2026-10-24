@@ -6,7 +6,7 @@ import { localDate } from './domain/day';
 import { Journal } from './domain/journal';
 import { LocalStore } from './storage/local';
 import { exportJournal, importJournal } from './storage/backup';
-import { finishDropboxConnection } from './sync/dropbox';
+import { configuredProviders, finishCloudConnection } from './sync/providers';
 import { setupCloudSettings } from './ui/cloud-settings';
 import { setupPhotoCleanup } from './ui/photo-cleanup';
 import { SyncEngine } from './sync/engine';
@@ -37,6 +37,8 @@ async function start(): Promise<void> {
   let lastSync: Date | undefined;
   let dirty = true;
   let engine: SyncEngine | undefined;
+  let cloudName: string | undefined;
+  const providers = configuredProviders();
   let syncTimer: ReturnType<typeof setTimeout> | undefined;
   let nextDay: ReturnType<typeof setTimeout>;
   let photoTarget: { date: string; anchor: A.Cursor; head: A.Cursor } | undefined;
@@ -44,7 +46,7 @@ async function start(): Promise<void> {
 
   await journal.load();
   let justConnected = false;
-  try { justConnected = await finishDropboxConnection(local); } catch (error) { notify(error); }
+  try { justConnected = await finishCloudConnection(local, providers); } catch (error) { notify(error); }
 
   function updateStatus(): void {
     ui.status.classList.toggle('has-error', !!journal.saveError || syncError);
@@ -55,7 +57,7 @@ async function start(): Promise<void> {
       : cleaning ? 'Saved on device · updating photos…'
       : syncing ? 'Saved on device · syncing…'
       : syncError ? 'Saved on device · sync needs attention'
-      : engine && lastSync && !dirty ? 'Saved to Dropbox'
+      : engine && lastSync && !dirty ? `Saved to ${cloudName}`
       : 'Saved on this device';
     ui.sync.disabled = syncing || cleaning;
     ui.sync.textContent = syncing ? 'Syncing…' : 'Sync now';
@@ -65,7 +67,7 @@ async function start(): Promise<void> {
     if (cleaning && !strict) return;
     if (!engine || !navigator.onLine) {
       updateStatus();
-      if (strict) throw new Error('Dropbox sync is unavailable. No photos were deleted.');
+      if (strict) throw new Error('Cloud sync is unavailable. No photos were deleted.');
       return;
     }
     if (syncing) {
@@ -273,12 +275,12 @@ async function start(): Promise<void> {
     },
     notify,
   });
-  await setupCloudSettings(ui, journal, {
+  await setupCloudSettings(ui, journal, providers, {
     busy: () => syncing || cleaning,
     activity: value => { cloudWorking = value; },
-    change: next => {
+    change: (next, name) => {
       clearTimeout(syncTimer);
-      engine = next; syncError = false; lastSync = undefined; dirty = true;
+      engine = next; cloudName = name; syncError = false; lastSync = undefined; dirty = true;
       updateStatus();
     },
     sync, notify,

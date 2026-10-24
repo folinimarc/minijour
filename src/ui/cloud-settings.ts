@@ -1,44 +1,49 @@
 import { EncryptedFiles, type RememberedVault } from '../crypto/vault';
 import type { Journal } from '../domain/journal';
 import { VAULT_KEY_SETTING } from '../storage/local';
-import { connectDropbox, DropboxFiles, redirectUri } from '../sync/dropbox';
+import { connectCloud } from '../sync/providers';
+import type { CloudProvider, CloudSession } from '../sync/provider';
 import { SyncEngine } from '../sync/engine';
 import type { mountShell } from './shell';
 
-/** Owns connection/unlock controls. Writing and local storage never depend on it. */
+/** Shared account/unlock controls. Deployment configuration stays in providers. */
 export async function setupCloudSettings(
-  ui: ReturnType<typeof mountShell>, journal: Journal,
+  ui: ReturnType<typeof mountShell>, journal: Journal, providers: CloudProvider[],
   options: {
     busy: () => boolean; activity: (value: boolean) => void;
-    change: (engine?: SyncEngine) => void; sync: () => Promise<void>; notify: (error: unknown) => void;
+    change: (engine?: SyncEngine, providerName?: string) => void;
+    sync: () => Promise<void>; notify: (error: unknown) => void;
   },
 ): Promise<void> {
   const local = journal.local;
-  let cloud = await DropboxFiles.open(local);
+  const owner = await local.cloudOwner();
+  const provider = providers.find(provider => provider.id === owner?.providerId);
+  let session: CloudSession | undefined;
+  if (provider) {
+    try { session = await provider.open(local); } catch (error) { options.notify(error); }
+  }
+  const providerName = provider?.name || 'Cloud storage';
   let header: Awaited<ReturnType<typeof EncryptedFiles.inspect>>;
   let unlocked = false;
   let working = false;
   let inspected = false;
-  const hostedKey = import.meta.env.VITE_DROPBOX_APP_KEY?.trim() || '';
-  const hasAppKey = () => /^[a-zA-Z0-9]+$/.test(ui.appKey.value.trim());
   const setWorking = (value: boolean) => { working = value; options.activity(value); };
   const show = () => {
-    ui.setup.hidden = !!cloud;
-    ui.unconfigured.hidden = !!cloud || hasAppKey();
-    ui.accountHelp.hidden = !hasAppKey();
-    ui.connect.hidden = !hasAppKey();
-    ui.connect.disabled = !hasAppKey();
-    ui.connected.hidden = !cloud;
-    ui.vaultForm.hidden = !cloud || unlocked || !inspected;
-    ui.checkCloud.hidden = !cloud || unlocked || inspected;
+    ui.cloudSection.hidden = providers.length === 0;
+    ui.providerList.hidden = !!session;
+    ui.accountHelp.hidden = !!session;
+    for (const [entry, button] of buttons) button.disabled = working || !!owner && owner.providerId !== entry.id;
+    ui.connected.hidden = !session;
+    ui.vaultForm.hidden = !session || unlocked || !inspected;
+    ui.checkCloud.hidden = !session || unlocked || inspected;
     ui.checkCloud.disabled = working;
     ui.sync.hidden = !unlocked;
     ui.lock.hidden = !unlocked;
     ui.connectionDescription.textContent = unlocked
-      ? 'Connected. Your journal syncs encrypted to your Dropbox.'
-      : cloud ? 'Dropbox is connected. Unlock cloud access to sync. You can keep writing locally.'
-      : hasAppKey() ? 'Connect your own Dropbox account for encrypted sync. You don’t need a Dropbox developer account.'
-      : 'Your journal saves on this device. Dropbox sync hasn’t been configured for this website.';
+      ? `Connected to ${providerName}. Your journal syncs encrypted.`
+      : session ? `${providerName} is connected. Unlock cloud access to sync. You can keep writing locally.`
+      : owner ? 'This journal is linked to its original cloud account. Reconnect it to resume sync.'
+      : 'Your journal saves on this device. Connect your own cloud account for encrypted sync.';
     ui.confirmation.hidden = !!header;
     ui.password.autocomplete = header ? 'current-password' : 'new-password';
     ui.passwordConfirm.required = !header;
@@ -48,9 +53,9 @@ export async function setupCloudSettings(
       : 'Choose a cloud password of at least 12 characters. Use the same password on each device.';
     ui.importLegacy.disabled = !unlocked || working;
   };
-  const use = async (vault: EncryptedFiles) => {
+  const use = (vault: EncryptedFiles) => {
     unlocked = true;
-    options.change(new SyncEngine(journal, vault));
+    options.change(new SyncEngine(journal, vault), providerName);
     ui.password.value = ''; ui.passwordConfirm.value = '';
     show();
   };
@@ -58,72 +63,68 @@ export async function setupCloudSettings(
     if (working || options.busy()) throw new Error('Wait for the current cloud operation to finish.');
   };
   const inspect = async () => {
-    if (!cloud) return;
-    header = await EncryptedFiles.inspect(cloud);
+    if (!session) return;
+    header = await EncryptedFiles.inspect(session.files);
     inspected = true;
     const saved = await local.setting<RememberedVault>(VAULT_KEY_SETTING);
     if (header) {
-      const vault = EncryptedFiles.remembered(cloud, header, saved);
-      if (vault) await use(vault);
+      const vault = EncryptedFiles.remembered(session.files, header, saved);
+      if (vault) use(vault);
     }
-    ui.legacy.hidden = !(await cloud.legacy().list()).length;
+    ui.legacy.hidden = !session.legacyFiles || !(await session.legacyFiles.list()).length;
+    ui.legacyDescription.textContent = `Older, unencrypted files remain in ${providerName}. Import them to include entries from other devices. Importing leaves the originals and cloud version history in place; remove old copies separately if needed.`;
   };
-  ui.appKey.value = hostedKey || await local.setting<string>('dropbox-app-key') || '';
-  ui.developerSetup.hidden = !!hostedKey;
-  ui.appKey.oninput = show;
-  ui.redirect.value = redirectUri();
-  ui.connect.onclick = () => { void (async () => {
-    ui.connect.disabled = true;
-    await journal.flush();
-    await local.setSetting('dropbox-app-key', ui.appKey.value.trim());
-    await connectDropbox(ui.appKey.value);
-  })().catch(error => { ui.connect.disabled = false; options.notify(error); }); };
+  const buttons = providers.map(entry => {
+    const button = document.createElement('button');
+    button.className = 'primary-button'; button.textContent = `Connect ${entry.name}`;
+    button.onclick = () => { void (async () => {
+      guard(); setWorking(true); show();
+      try { await journal.flush(); await connectCloud(entry); }
+      finally { setWorking(false); show(); }
+    })().catch(options.notify); };
+    ui.providerList.append(button);
+    return [entry, button] as const;
+  });
   ui.vaultForm.onsubmit = event => {
     event.preventDefault();
     void (async () => {
       guard();
-      if (!cloud) return;
+      if (!session) return;
       if (!header && ui.password.value !== ui.passwordConfirm.value) throw new Error('The passwords do not match.');
       setWorking(true); show();
       try {
-        // Re-inspect on every attempt: another device may have finished setup.
-        const current = await EncryptedFiles.inspect(cloud);
-        const vault = current ? await EncryptedFiles.unlock(cloud, current, ui.password.value)
-          : await EncryptedFiles.create(cloud, ui.password.value);
-        header = await EncryptedFiles.inspect(cloud);
+        const current = await EncryptedFiles.inspect(session.files);
+        const vault = current ? await EncryptedFiles.unlock(session.files, current, ui.password.value)
+          : await EncryptedFiles.create(session.files, ui.password.value);
+        header = await EncryptedFiles.inspect(session.files);
         if (ui.remember.checked) await local.rememberVaultKey({ descriptor: vault.descriptor, key: vault.key });
         else await local.removeSetting(VAULT_KEY_SETTING);
-        await use(vault);
-        ui.notice.hidden = true;
+        use(vault); ui.notice.hidden = true;
         await options.sync();
       } finally { setWorking(false); ui.password.value = ''; ui.passwordConfirm.value = ''; show(); }
     })().catch(options.notify);
   };
   ui.lock.onclick = () => { void (async () => {
-    guard();
-    setWorking(true);
-    try {
-      await local.removeSetting(VAULT_KEY_SETTING);
-      unlocked = false; options.change();
-    } finally { setWorking(false); show(); }
+    guard(); setWorking(true);
+    try { await local.removeSetting(VAULT_KEY_SETTING); unlocked = false; options.change(); }
+    finally { setWorking(false); show(); }
   })().catch(options.notify); };
   ui.disconnect.onclick = () => { void (async () => {
-    guard();
-    setWorking(true);
+    guard(); setWorking(true);
     try {
-      await DropboxFiles.disconnect(local);
-      cloud = undefined; header = undefined; unlocked = false; inspected = false;
+      await session?.disconnect();
+      session = undefined; header = undefined; unlocked = false; inspected = false;
       options.change(); ui.legacy.hidden = true;
     } finally { setWorking(false); show(); }
   })().catch(options.notify); };
   ui.importLegacy.onclick = () => { void (async () => {
     guard();
-    if (!cloud || !unlocked) return;
+    if (!session?.legacyFiles || !unlocked) return;
     setWorking(true); show();
     try {
-      await new SyncEngine(journal, cloud.legacy()).importOnly();
+      await new SyncEngine(journal, session.legacyFiles).importOnly();
       await options.sync();
-      options.notify('Older files imported. The unencrypted originals and their version history remain in Dropbox.');
+      options.notify('Older files imported. The unencrypted originals and their version history remain in cloud storage.');
     } finally { setWorking(false); show(); }
   })().catch(options.notify); };
   ui.sync.onclick = () => { void options.sync(); };
@@ -135,8 +136,7 @@ export async function setupCloudSettings(
   };
   ui.checkCloud.onclick = () => { void check().then(options.sync); };
   window.addEventListener('online', () => {
-    if (cloud && !inspected && !working) void check().then(options.sync);
+    if (session && !inspected && !working) void check().then(options.sync);
   });
-  show();
-  await check();
+  show(); await check();
 }

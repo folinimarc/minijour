@@ -17,11 +17,11 @@ export function setupPhotoCleanup(
   ui.dialog.addEventListener('close', reset);
 
   const prepare = async () => {
-    if (options.cloudBusy()) throw new Error('Wait for the current Dropbox operation to finish before cleaning up photos.');
-    const bound = await journal.local.setting('dropbox-journal-owner') || await journal.local.setting('dropbox-connection');
+    if (options.cloudBusy()) throw new Error('Wait for the current cloud operation to finish before cleaning up photos.');
+    const bound = await journal.local.cloudOwner();
     if (!bound) return;
-    if (!navigator.onLine) throw new Error('Go online before cleaning up a journal linked to Dropbox. Other devices may have photo references to keep.');
-    if (!options.cloudReady()) throw new Error('Connect and unlock your original Dropbox account before cleaning up photos.');
+    if (!navigator.onLine) throw new Error('Go online before cleaning up a journal linked to cloud storage. Other devices may have photo references to keep.');
+    if (!options.cloudReady()) throw new Error('Connect and unlock your original cloud account before cleaning up photos.');
     await options.sync(); // Failure must prevent deletion, not silently use stale data.
   };
   const run = async (action: () => Promise<void>) => {
@@ -46,7 +46,7 @@ export function setupPhotoCleanup(
     ui.photoCleanupSummary.textContent = `${candidates.length} unused ${candidates.length === 1 ? 'photo' : 'photos'} · ${size} on this device.`;
     ui.photoCleanupReview.hidden = false;
     ui.photoCleanupReview.scrollIntoView({ block: 'nearest' });
-    ui.confirmPhotoCleanup.focus();
+    ui.confirmPhotoCleanup.focus({ preventScroll: true });
   }); };
   ui.confirmPhotoCleanup.onclick = () => {
     const selected = plan;
@@ -62,7 +62,7 @@ export function setupPhotoCleanup(
       const removed = await journal.deletePhotos(selected.map(photo => photo.name), { onlyUnused: true });
       try { if (options.cloudReady()) await options.sync(); }
       catch {
-        options.notify('Photos were removed on this device. Dropbox cleanup is pending and will retry when sync succeeds.');
+        options.notify('Photos were removed on this device. Cloud cleanup is pending and will retry when sync succeeds.');
         return;
       }
       options.notify(removed.length ? `Permanently removed ${removed.length} unused ${removed.length === 1 ? 'photo' : 'photos'}.`

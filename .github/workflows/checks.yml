@@ -19,11 +19,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dropbox: [manual, hosted]
+        configuration: [local-only, cloud]
     env:
       # Synthetic public key: browser tests mock Dropbox, never use real accounts.
-      VITE_DROPBOX_APP_KEY: ${{ matrix.dropbox == 'hosted' && 'testpublickey' || '' }}
-      MINIJOUR_TEST_SUBDIRECTORY: ${{ matrix.dropbox == 'hosted' && '1' || '0' }}
+      VITE_DROPBOX_APP_KEY: ${{ matrix.configuration == 'cloud' && 'testpublickey' || '' }}
+      MINIJOUR_TEST_SUBDIRECTORY: ${{ matrix.configuration == 'cloud' && '1' || '0' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
@@ -39,6 +39,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: browser-results-${{ matrix.dropbox }}
+          name: browser-results-${{ matrix.configuration }}
           path: test-results/
           retention-days: 5

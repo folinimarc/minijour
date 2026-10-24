@@ -1,4 +1,4 @@
-/** The only contract a cloud provider needs to implement. Paths are app-relative. */
+/** Remote file operations used by sync and encryption. Paths are app-relative. */
 export type RemoteFile = { path: string; revision: string };
 
 export interface CloudFiles {

@@ -22,7 +22,7 @@ export async function preparePhoto(file: File): Promise<{ name: string; blob: Bl
   } finally { image.close(); }
 }
 
-/** Object URLs are local display handles, never stored in Markdown or Dropbox. */
+/** Object URLs are local display handles, never stored in Markdown or cloud storage. */
 export class PhotoUrls {
   private urls = new Map<string, string>();
   version = 0;

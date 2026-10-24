@@ -38,7 +38,7 @@ export default defineConfig(({ mode }) => {
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'minijour', short_name: 'minijour',
-        description: 'A Markdown journal with photos and optional encrypted Dropbox sync.',
+        description: 'A Markdown journal with photos and optional encrypted cloud sync.',
         id: base, start_url: './journal/', scope: './', display: 'standalone',
         background_color: '#f7f6f2', theme_color: '#f7f6f2',
         icons: [

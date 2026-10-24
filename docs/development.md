@@ -22,7 +22,7 @@ The development server deliberately does not register a service worker. This pre
 
 ## Architecture
 
-This project intentionally uses TypeScript and normal DOM elements instead of a UI framework. There is one small abstraction for remote files and no generic plugin or service-container system.
+This project intentionally uses TypeScript and normal DOM elements instead of a UI framework. Small interfaces describe remote files and provider connections; there is no plugin loader or service-container system.
 
 ```text
 src/
@@ -43,7 +43,9 @@ src/
     photo-cleanup.ts  Candidate photo IDs and sizes for explicit review
   sync/
     cloud.ts          File contract, plus atomic create for vault storage
-    dropbox.ts        Dropbox OAuth and API requests
+    provider.ts       Provider/session interfaces for authorization and storage
+    providers.ts      Build-time provider registry and OAuth callback dispatch
+    dropbox.ts        Dropbox adapter, OAuth, and API requests
     engine.ts         Pull, Automerge merge, and push
   ui/
     photo-cleanup.ts  Review, confirmation, and required cloud sync
@@ -60,7 +62,7 @@ If you're learning, follow this path:
 2. Read `storage/local.ts` to see how data survives closing the page.
 3. Follow a keystroke from `ui/editor.ts` through `main.ts` to `Journal.merge()`.
 4. Read `sync/cloud.ts`, then `sync/engine.ts`. The engine doesn't know about HTTP or OAuth.
-5. Read `crypto/vault.ts`, which wraps that file contract with encryption, then `sync/dropbox.ts` for HTTP/OAuth. Encryption stays outside the document and merge logic.
+5. Read `crypto/vault.ts`, which wraps that file contract with encryption, then `sync/provider.ts` and `sync/providers.ts` for connection setup. `sync/dropbox.ts` implements HTTP/OAuth. Encryption stays outside the document and merge logic.
 
 ### Pages and PWA launch
 
@@ -78,9 +80,27 @@ On each editor update, `Automerge.updateText()` records text operations. Incomin
 
 IndexedDB saves merge inside a read/write transaction. That protects against two tabs writing stale copies. A BroadcastChannel updates other open tabs after a successful save.
 
-### Dropbox file layout
+### Cloud providers
 
-The sync engine works with logical paths `/days/YYYY-MM-DD/<writer-id>.automerge` and `/photos/<photo-id>.jpg`. `EncryptedFiles` translates these before Dropbox receives anything:
+`sync/providers.ts` is the only place that selects providers from build configuration. It returns configured `CloudProvider` instances; `ui/cloud-settings.ts` renders their connection buttons and shares the password, encryption, lock, disconnect, and legacy-import controls. An empty registry hides cloud settings. Neither the editor nor the sync engine imports a provider adapter.
+
+A `CloudProvider` has a stable ID and display name, starts authorization, finishes its callback, and opens a saved connection. Its `CloudSession` provides `VaultStorage`, disconnect, and optionally read-only legacy files. The shared OAuth dispatcher remembers the selected provider in the current tab, invokes only that provider on return, and clears callback parameters. Each adapter validates its own state and authorization response.
+
+The current registry contains only Dropbox. Existing Dropbox tokens and remembered keys remain usable after this refactor. A disabled provider is never opened automatically, even if credentials remain on the device. Changing a deployment's Dropbox key blocks its old connection rather than moving the journal to a different application.
+
+### Add a cloud provider
+
+1. Implement `CloudProvider` in a new adapter under `sync/`. Keep provider-specific authorization and HTTP requests there. Use browser-safe authorization such as PKCE where supported; never ship an app secret. Check that the provider supports static websites and the required permissions.
+2. Return a `CloudSession` whose `files` implements `VaultStorage`: list paths/revisions, download, upload, idempotent remove, and atomic create-if-absent. Atomic create must work across devices, not just within one tab: it prevents replacing another device's encryption header. Keep existing file roots and revision semantics stable.
+3. Store credentials through `LocalStore.saveCloudConnection({ providerId, appId, accountId }, connection)`. IDs must identify the actual provider application and account. On opening or refreshing an existing connection, use `{ requireExisting: true }` so a concurrent disconnect cannot be undone. Use `cloudConnection()` to read and `disconnectCloud()` to remove credentials and the remembered key; retain ownership after disconnect.
+4. Add its public build configuration and factory to `configuredProviders()`, and document operator registration and exact redirect URIs in the deployment guide. Add typed environment fields in `env.d.ts`. No provider branches belong in shared settings, encryption, or sync.
+5. Add adapter tests for authorization, refresh/disconnect races, atomic creation, file operations, and account binding. Exercise the shared encrypted sync flow with a mock, then verify the actual provider in browsers and installed PWAs before claiming support.
+
+One local journal uses one provider and account. Switching storage providers or moving a journal to another account is a separate migration feature; merely adding an adapter does not enable it.
+
+### Cloud file layout
+
+The sync engine works with logical paths `/days/YYYY-MM-DD/<writer-id>.automerge` and `/photos/<photo-id>.jpg`. `EncryptedFiles` translates these before the provider receives anything (Dropbox stores them under its app folder):
 
 ```text
 minijour-encrypted-v1/
@@ -103,7 +123,7 @@ We retain checkpoints and small permanent photo deletion records. Photo files ar
 
 `domain/photos.ts` scans for `photos/<UUID>.jpg` paths conservatively, including Markdown reference links and code examples. It checks current text across all days, not just the visible editor. `storage/photo-cleanup.ts` produces a review snapshot of specific IDs and sizes. Only those IDs may be deleted when confirmed; newly unused photos need a new review.
 
-For Dropbox-bound journals, the UI requires an online, unlocked, successful sync before review and again before deletion. A failed fetch prevents local cleanup. Local removal rechecks references inside an IndexedDB read/write transaction across `days`, `photos`, and `settings`, so saved references from other tabs are respected. Ordinary Markdown deletion never triggers this operation.
+For cloud-bound journals, the UI requires an online, unlocked, successful sync before review and again before deletion. A failed fetch prevents local cleanup. Local removal rechecks references inside an IndexedDB read/write transaction across `days`, `photos`, and `settings`, so saved references from other tabs are respected. Ordinary Markdown deletion never triggers this operation.
 
 The same transaction records permanent deletions in the settings key `photo-deletions-v1` and removes the blobs. The value is a grow-only set represented as a sorted array of photo names. This needs no database schema upgrade. Photo saves check that set transactionally, including downloads, backup restore, and legacy import. Legacy plaintext imports cannot introduce deletion records: those files are ignored outside normal encrypted sync. Preview blob URLs are revoked and rebuilt across tabs after changes.
 
@@ -143,7 +163,7 @@ An exported `journal.md` can be read in Obsidian. **Editing that exported file d
 
 ## Checks
 
-GitHub Actions runs unit tests and production browser tests on pull requests and pushes to `main`. Its two configurations cover manual Dropbox setup at the root and a configured deployment at `/minijour/`. You can reproduce the latter with:
+GitHub Actions runs unit tests and production browser tests on pull requests and pushes to `main`. Its two configurations cover a local-only build at the root and a cloud-enabled build at `/minijour/`. The latter runs the Dropbox integration tests; the former checks that no cloud controls or requests appear, including with credentials saved by an older build. You can reproduce the latter with:
 
 ```sh
 MINIJOUR_TEST_SUBDIRECTORY=1 VITE_DROPBOX_APP_KEY=testpublickey npm run test:browser
@@ -158,7 +178,7 @@ npm run test:browser
 npm run build
 ```
 
-Unit tests cover encryption round trips, authentication failures, concurrent vault setup, remembered keys, legacy import, and independent day creation, text convergence, concurrent local saves, cursor anchors with emoji, offline sync, failed uploads, photo transfer, permanent cleanup, stale-device deletion, and backup restore. Browser tests exercise the production build: focus and persistence, photo insertion, offline reloads, midnight rollover, multiple tabs, restore, and Dropbox authorization/sync across two simulated devices.
+Unit tests cover provider configuration and callback routing, provider/app/account binding, legacy connection adoption, encryption round trips, authentication failures, concurrent vault setup, remembered keys, legacy import, and independent day creation, text convergence, concurrent local saves, cursor anchors with emoji, offline sync, failed uploads, photo transfer, permanent cleanup, stale-device deletion, and backup restore. Browser tests exercise the production build: focus and persistence, photo insertion, offline reloads, midnight rollover, multiple tabs, restore, and Dropbox authorization/sync across two simulated devices.
 
 Dropbox browser tests mock the network boundary. A real Dropbox app/account and the actual mobile camera/keyboard still need a device smoke test before relying on the app for irreplaceable entries.
 
@@ -166,7 +186,7 @@ The checked-in app icons can be regenerated with `node scripts/generate-icons.mj
 
 ## Compatibility
 
-The first Dropbox connection binds the local journal to its account and app key. That binding survives disconnect. Ownership and the new connection are checked/stored atomically, including legacy connections from earlier builds. Disconnect removes the connection and remembered vault key in one transaction. Remembering a key also checks the connection in the same transaction, so an unlock finishing in another tab cannot restore a key after disconnect. This blocks accidental cross-account uploads without deleting or automatically moving user data. Separate accounts use separate browser profiles.
+The first cloud connection binds the local journal to its provider, application, and account. That binding survives disconnect. Ownership and the new connection are checked/stored atomically, including legacy connections from earlier builds. The generic binding uses `cloud-journal-owner`; existing Dropbox connection/owner keys remain readable and are preserved for older open clients. No database schema upgrade or token move is needed. Disconnect removes the connection and remembered vault key in one transaction. Remembering a key also checks the connection in the same transaction, so an unlock finishing in another tab cannot restore a key after disconnect. This blocks accidental cross-account uploads without deleting or automatically moving user data. Separate accounts use separate browser profiles.
 
 The app version, IndexedDB schema, Dropbox layout, and backup format are separate concerns. Do not rename the database, channel, or cloud root for routine releases. Older installed PWAs may keep running after deployment: test compatibility and migrations before changing persisted data.
 

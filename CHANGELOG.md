@@ -17,8 +17,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 - Portable Markdown/photo backups with lossless restore of editing history.
 - Automated coverage for persistence, offline reloads, date rollover, multi-tab updates, backups, and mocked Dropbox sync.
 - User, developer, deployment, and release guides, with GPL-3.0-only licensing.
-- A simple Dropbox connection flow on deployments with a configured app key.
-- CI for manual setup and hosted subdirectory builds, plus tag-based release and GitHub Pages deployment workflows.
+- A provider registry and shared cloud connection controls. Only providers configured by the website operator appear; Dropbox is the first supported provider.
+- CI for local-only and cloud-enabled subdirectory builds, plus tag-based release and GitHub Pages deployment workflows.
 - Version/source details and GPL/dependency notices in the app and static build.
 - Reproducible site/source archives with checksums and validation against the release tag and changelog.
 
@@ -28,9 +28,9 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Fixed
 
-- Clearly identify missing Dropbox setup as a website-operator task and keep manual developer fields collapsed, while configured websites retain the simple personal-account connection flow.
+- Keep cloud provider configuration in deployment documentation and remove developer setup fields from the frontend.
 
-- Block connecting a local journal to another Dropbox account or app, including after disconnecting, to prevent accidental cross-account uploads.
+- Block connecting a local journal to another cloud provider, account, or app, including after disconnecting, to prevent accidental cross-account uploads.
 - Prevent a pending unlock in another tab from restoring a remembered encryption key after Dropbox disconnects.
 
 No release has been published yet. The first intended version is 0.1.0.

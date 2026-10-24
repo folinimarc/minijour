@@ -1,6 +1,7 @@
 import { journalUrl } from '../urls';
 import type { LocalStore } from '../storage/local';
 import type { VaultStorage, RemoteFile } from './cloud';
+import type { CloudProvider } from './provider';
 
 type Connection = {
   appKey: string;
@@ -16,9 +17,21 @@ type TokenResponse = {
 type FileEntry = { '.tag': string; path_lower: string; rev: string };
 type FolderPage = { entries: FileEntry[]; cursor: string; has_more: boolean };
 
-const CONNECTION = 'dropbox-connection';
 const OAUTH = 'minijour-oauth';
 const ROOT = '/minijour-encrypted-v1';
+const identity = (connection: Connection) => ({ providerId: 'dropbox', appId: connection.appKey, accountId: connection.accountId });
+
+export function dropboxProvider(appKey: string): CloudProvider {
+  return {
+    id: 'dropbox', name: 'Dropbox',
+    connect: () => connectDropbox(appKey),
+    finishConnection: local => finishDropboxConnection(local, appKey),
+    open: async local => {
+      const files = await DropboxFiles.open(local, appKey);
+      return files ? { files, disconnect: () => DropboxFiles.disconnect(local), legacyFiles: files.legacy() } : undefined;
+    },
+  };
+}
 
 function base64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
@@ -52,13 +65,14 @@ async function tokenRequest(params: URLSearchParams): Promise<TokenResponse> {
 }
 
 /** Finish PKCE after Dropbox redirects back. Tokens stay on this device. */
-export async function finishDropboxConnection(local: LocalStore): Promise<boolean> {
+export async function finishDropboxConnection(local: LocalStore, appKey: string): Promise<boolean> {
   const params = new URLSearchParams(location.search);
   if (!params.has('code') && !params.has('error')) return false;
   const raw = sessionStorage.getItem(OAUTH);
   try {
     if (!raw) throw new Error('Dropbox connection was started in another tab. Please try again.');
     const attempt: OAuthAttempt = JSON.parse(raw);
+    if (attempt.appKey !== appKey) throw new Error('Dropbox sign-in has changed. Please start connecting again.');
     if (params.get('state') !== attempt.state) throw new Error('Dropbox authorization could not be verified. Please try again.');
     if (params.has('error')) throw new Error('Dropbox connection was cancelled. Your journal is still saved on this device.');
     const token = await tokenRequest(new URLSearchParams({
@@ -66,15 +80,14 @@ export async function finishDropboxConnection(local: LocalStore): Promise<boolea
       code_verifier: attempt.verifier, redirect_uri: attempt.redirectUri,
     }));
     if (!token.refresh_token || !token.account_id) throw new Error('Dropbox did not grant offline access. Please reconnect.');
-    await local.saveDropboxConnection({
+    const connection = {
       appKey: attempt.appKey, accessToken: token.access_token, refreshToken: token.refresh_token,
       expiresAt: Date.now() + token.expires_in * 1000, accountId: token.account_id,
-    } satisfies Connection);
+    } satisfies Connection;
+    await local.saveCloudConnection(identity(connection), connection);
     return true;
   } finally {
     sessionStorage.removeItem(OAUTH);
-    params.delete('code'); params.delete('state'); params.delete('error'); params.delete('error_description');
-    history.replaceState(null, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
   }
 }
 
@@ -85,18 +98,19 @@ export class DropboxFiles implements VaultStorage {
 
   legacy(): DropboxFiles { return new DropboxFiles(this.local, this.connection, '/minijour-v1'); }
 
-  static async open(local: LocalStore): Promise<DropboxFiles | undefined> {
-    const connection = await local.setting<Connection>(CONNECTION);
-    if (connection) await local.saveDropboxConnection(connection, { requireExisting: true });
+  static async open(local: LocalStore, appKey?: string): Promise<DropboxFiles | undefined> {
+    const connection = await local.cloudConnection<Connection>('dropbox');
+    if (connection && appKey && connection.appKey !== appKey) throw new Error('This journal uses a different Dropbox app. Its original app and account are needed to resume sync.');
+    if (connection) await local.saveCloudConnection(identity(connection), connection, { requireExisting: true });
     return connection ? new DropboxFiles(local, connection) : undefined;
   }
 
   static async disconnect(local: LocalStore): Promise<void> {
-    await local.disconnectDropbox();
+    await local.disconnectCloud('dropbox');
   }
 
   private async token(): Promise<string> {
-    const active = await this.local.setting<Connection>(CONNECTION);
+    const active = await this.local.cloudConnection<Connection>('dropbox');
     if (!active || active.accountId !== this.connection.accountId || active.appKey !== this.connection.appKey) {
       throw new Error('Dropbox was disconnected in another tab. Reload to update this app.');
     }
@@ -108,7 +122,7 @@ export class DropboxFiles implements VaultStorage {
         }));
         this.connection = { ...this.connection, accessToken: token.access_token, expiresAt: Date.now() + token.expires_in * 1000 };
         // A disconnect during the refresh request must not restore a connection.
-        await this.local.saveDropboxConnection(this.connection, { requireExisting: true });
+        await this.local.saveCloudConnection(identity(this.connection), this.connection, { requireExisting: true });
       })().finally(() => { this.refreshing = undefined; });
       await this.refreshing;
     }

@@ -36,25 +36,12 @@ export function mountShell() {
     <button id="update-button" class="update-button" hidden>Update ready · reload</button>
     <dialog id="settings-dialog" aria-labelledby="settings-title">
       <div class="dialog-header"><h1 id="settings-title">Settings</h1><button id="close-settings" class="icon-button" aria-label="Close settings">${icon('close')}</button></div>
-      <section class="settings-section">
-        <h2>${icon('cloud')}Dropbox sync</h2>
-        <p id="connection-description">Your journal saves on this device.</p>
-        <div id="dropbox-setup" hidden>
-          <p id="dropbox-unconfigured" class="help" hidden>The site operator needs to enable Dropbox sync. You don’t need to create a Dropbox app. You can keep writing and downloading backups.</p>
-          <details id="dropbox-developer-setup" hidden>
-          <summary>Self-hosting and developer setup</summary>
-          <p class="help">Only the website operator needs to register a Dropbox app. One app serves all visitors; each person connects their own Dropbox account.</p>
-          <p class="help">Create a scoped <strong>App folder</strong> app in the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer">Dropbox App Console</a>. Enable <code>files.metadata.read</code>, <code>files.content.read</code>, and <code>files.content.write</code>.</p>
-          <p class="help">To enable Dropbox for everyone, set the public <code>VITE_DROPBOX_APP_KEY</code> before building, then redeploy the website. Never include an app secret. The manual key below applies only to this browser.</p>
-          <label for="app-key">Dropbox app key</label>
-          <input id="app-key" type="text" spellcheck="false" autocomplete="off" placeholder="Your public app key" />
-          <label for="redirect-uri">OAuth redirect URI</label><input id="redirect-uri" readonly />
-          <p class="help">Add this exact address to your app’s redirect URIs. Use the same app key on each device.</p>
-          </details>
-          <p id="dropbox-account-help" class="help" hidden>Local entries combine with your journal in your own Dropbox. This browser’s journal stays associated with that account after disconnecting.</p>
-          <button id="connect-button" class="primary-button" hidden>Connect Dropbox</button>
-        </div>
-        <div id="dropbox-connected" class="button-row" hidden>
+      <section id="cloud-section" class="settings-section" hidden>
+        <h2>${icon('cloud')}Cloud sync</h2>
+        <p id="connection-description">Your journal saves on this device. Connect your own cloud account for encrypted sync.</p>
+        <div id="cloud-providers" class="button-row" hidden></div>
+        <p id="cloud-account-help" class="help">Local entries combine with your journal in that account. This browser’s journal stays linked to the same provider and account after disconnecting.</p>
+        <div id="cloud-connected" class="button-row" hidden>
           <button id="sync-button" class="primary-button">Sync now</button>
           <button id="lock-button" class="secondary-button">Lock cloud</button>
           <button id="disconnect-button" class="secondary-button">Disconnect</button>
@@ -69,12 +56,12 @@ export function mountShell() {
           <p class="help">Keep your password somewhere safe. There is no password reset. Your local journal and downloaded backups are not encrypted by minijour.</p>
           <button id="unlock-button" class="primary-button" type="submit">Unlock cloud</button>
         </form>
-        <button id="check-cloud-button" class="secondary-button" hidden>Check Dropbox</button>
+        <button id="check-cloud-button" class="secondary-button" hidden>Retry cloud connection</button>
         <div id="legacy-cloud" hidden>
-          <p class="help">Older, unencrypted files still exist in your Dropbox app folder under <code>minijour-v1</code>. Import them to include entries from other devices. Importing leaves those files and Dropbox version history in place; remove old copies separately in Dropbox if needed.</p>
-          <button id="import-legacy-button" class="secondary-button">Import older Dropbox files</button>
+          <p id="legacy-cloud-description" class="help"></p>
+          <button id="import-legacy-button" class="secondary-button">Import older cloud files</button>
         </div>
-        <p class="help">When connected, text, editing history, and photos are encrypted on this device before upload. Dropbox can still see file sizes and upload times. Sync runs while the app is open and cloud access is unlocked.</p>
+        <p class="help">When connected, text, editing history, and photos are encrypted on this device before upload. Your cloud provider can still see file sizes and upload times. Sync runs while the app is open and cloud access is unlocked.</p>
       </section>
       <section class="settings-section">
         <h2>Download and restore</h2>
@@ -87,7 +74,7 @@ export function mountShell() {
         <button id="review-photos-button" class="secondary-button">Clean up unused photos</button>
         <div id="photo-cleanup-review" hidden>
           <p id="photo-cleanup-summary"></p>
-          <p class="help">This permanently removes these photos from this device and, when connected, Dropbox. Deletion syncs to other devices. Undo, old backups, or offline edits may bring back links with missing images. Existing backups, older Dropbox files, and cloud version history are not changed.</p>
+          <p class="help">This permanently removes these photos from this device and your connected cloud storage. Deletion syncs to other devices. Undo, old backups, or offline edits may bring back links with missing images. Existing backups, older cloud files, and cloud version history are not changed.</p>
           <div class="button-row"><button id="confirm-photo-cleanup" class="primary-button">Permanently delete photos</button><button id="cancel-photo-cleanup" class="text-button">Cancel</button></div>
         </div>
       </section>
@@ -95,7 +82,7 @@ export function mountShell() {
         <h2>Install</h2>
         <p>Install from your browser’s menu, or choose <strong>Add to Home Screen</strong> from the Share menu. After the first visit and offline installation, you can write without a connection.</p>
         <button id="install-button" class="secondary-button" hidden>Install minijour</button>
-        <p class="help">Dates follow your device’s local time. Day headings are automatic. Without Dropbox or an exported backup, clearing browser data removes your journal.</p>
+        <p class="help">Dates follow your device’s local time. Day headings are automatic. Without cloud sync or an exported backup, clearing browser data removes your journal.</p>
       </section>
       <section class="settings-section settings-small">
         <h2>About minijour <span class="app-version">${__APP_VERSION__}</span></h2>
@@ -113,22 +100,21 @@ export function mountShell() {
     chooseButton: get<HTMLButtonElement>('choose-button'), cameraInput: get<HTMLInputElement>('camera-input'),
     photoInput: get<HTMLInputElement>('photo-input'), restoreInput: get<HTMLInputElement>('restore-input'),
     notice: get<HTMLDivElement>('notice'), noticeText: get<HTMLSpanElement>('notice-text'), dismissNotice: get<HTMLButtonElement>('dismiss-notice'),
-    appKey: get<HTMLInputElement>('app-key'), redirect: get<HTMLInputElement>('redirect-uri'),
-    connect: get<HTMLButtonElement>('connect-button'), disconnect: get<HTMLButtonElement>('disconnect-button'),
+    disconnect: get<HTMLButtonElement>('disconnect-button'),
     sync: get<HTMLButtonElement>('sync-button'), export: get<HTMLButtonElement>('export-button'),
-    restore: get<HTMLButtonElement>('restore-button'), setup: get<HTMLDivElement>('dropbox-setup'),
+    restore: get<HTMLButtonElement>('restore-button'),
+    cloudSection: get<HTMLElement>('cloud-section'), providerList: get<HTMLDivElement>('cloud-providers'),
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),
     photoCleanupSummary: get<HTMLParagraphElement>('photo-cleanup-summary'),
     confirmPhotoCleanup: get<HTMLButtonElement>('confirm-photo-cleanup'), cancelPhotoCleanup: get<HTMLButtonElement>('cancel-photo-cleanup'),
-    developerSetup: get<HTMLDetailsElement>('dropbox-developer-setup'),
-    unconfigured: get<HTMLParagraphElement>('dropbox-unconfigured'), accountHelp: get<HTMLParagraphElement>('dropbox-account-help'),
+    accountHelp: get<HTMLParagraphElement>('cloud-account-help'),
     vaultForm: get<HTMLFormElement>('vault-form'), vaultDescription: get<HTMLParagraphElement>('vault-description'),
     password: get<HTMLInputElement>('cloud-password'), passwordConfirm: get<HTMLInputElement>('cloud-password-confirm'),
     confirmation: get<HTMLDivElement>('password-confirmation'), remember: get<HTMLInputElement>('remember-cloud'),
     unlock: get<HTMLButtonElement>('unlock-button'), lock: get<HTMLButtonElement>('lock-button'),
     checkCloud: get<HTMLButtonElement>('check-cloud-button'),
-    legacy: get<HTMLDivElement>('legacy-cloud'), importLegacy: get<HTMLButtonElement>('import-legacy-button'),
-    connected: get<HTMLDivElement>('dropbox-connected'), connectionDescription: get<HTMLParagraphElement>('connection-description'),
+    legacy: get<HTMLDivElement>('legacy-cloud'), legacyDescription: get<HTMLParagraphElement>('legacy-cloud-description'), importLegacy: get<HTMLButtonElement>('import-legacy-button'),
+    connected: get<HTMLDivElement>('cloud-connected'), connectionDescription: get<HTMLParagraphElement>('connection-description'),
     install: get<HTMLButtonElement>('install-button'), update: get<HTMLButtonElement>('update-button'),
   };
 }

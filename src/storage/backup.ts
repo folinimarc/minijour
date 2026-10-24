@@ -12,7 +12,7 @@ export async function exportJournal(journal: Journal): Promise<Blob> {
   const days = new Map(journal.days);
   const files: Record<string, Uint8Array> = {
     'journal.md': strToU8(markdown(days)),
-    'README.txt': strToU8('journal.md and photos/ are readable in any Markdown editor.\nOnly photos referenced in the current Markdown are included.\nTo restore text editing history and permanent photo deletion records in minijour, import this entire ZIP.\nPast photo references in editing history may have no image.\nDropbox credentials and encryption keys are never included.\n'),
+    'README.txt': strToU8('journal.md and photos/ are readable in any Markdown editor.\nOnly photos referenced in the current Markdown are included.\nTo restore text editing history and permanent photo deletion records in minijour, import this entire ZIP.\nPast photo references in editing history may have no image.\nCloud credentials and encryption keys are never included.\n'),
   };
   const deleted = await journal.local.photoDeletions();
   if (deleted.size) files[DELETIONS_FILE] = encodePhotoDeletions(deleted);

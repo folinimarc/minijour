@@ -6,6 +6,17 @@ import { PHOTO_NAME, referencedPhotos } from '../domain/photos';
 export type Photo = { name: string; blob: Blob };
 export const VAULT_KEY_SETTING = 'cloud-vault-key';
 const PHOTO_DELETIONS = 'photo-deletions-v1';
+const CLOUD_OWNER = 'cloud-journal-owner';
+export type CloudIdentity = { providerId: string; appId: string; accountId: string };
+
+// Keep existing Dropbox storage keys so upgrades preserve tokens and ownership.
+const connectionKey = (providerId: string) => providerId === 'dropbox' ? 'dropbox-connection' : `cloud-connection:${providerId}`;
+async function readCloudOwner(settings: { get(key: string): Promise<unknown> }): Promise<CloudIdentity | undefined> {
+  const owner = await settings.get(CLOUD_OWNER) as CloudIdentity | undefined;
+  if (owner) return owner;
+  const legacy = (await settings.get('dropbox-journal-owner') ?? await settings.get('dropbox-connection')) as { appKey: string; accountId: string } | undefined;
+  return legacy ? { providerId: 'dropbox', appId: legacy.appKey, accountId: legacy.accountId } : undefined;
+}
 
 interface Database extends DBSchema {
   days: { key: string; value: Uint8Array };
@@ -103,40 +114,55 @@ export class LocalStore {
     // A password derivation can finish after another tab disconnects. Check
     // the connection and save in one transaction, so it cannot restore a key.
     const tx = this.db.transaction('settings', 'readwrite');
-    if (!await tx.store.get('dropbox-connection')) {
+    const owner = await readCloudOwner(tx.store);
+    if (!owner || !await tx.store.get(connectionKey(owner.providerId))) {
       await tx.done;
-      throw new Error('Dropbox was disconnected. Reconnect before remembering the cloud key.');
+      throw new Error('Cloud storage was disconnected. Reconnect before remembering the cloud key.');
     }
     await tx.store.put(value, VAULT_KEY_SETTING);
     await tx.done;
   }
 
-  async disconnectDropbox(): Promise<void> {
+  async cloudOwner(): Promise<CloudIdentity | undefined> {
+    const tx = this.db.transaction('settings');
+    const owner = await readCloudOwner(tx.store);
+    await tx.done;
+    return owner;
+  }
+
+  async cloudConnection<T>(providerId: string): Promise<T | undefined> {
+    return this.setting<T>(connectionKey(providerId));
+  }
+
+  async disconnectCloud(providerId: string): Promise<void> {
     const tx = this.db.transaction('settings', 'readwrite');
-    await tx.store.delete('dropbox-connection');
+    await tx.store.delete(connectionKey(providerId));
     await tx.store.delete(VAULT_KEY_SETTING);
     await tx.done;
   }
 
-  async saveDropboxConnection<T extends { appKey: string; accountId: string }>(
-    connection: T, options: { requireExisting?: boolean } = {},
+  async saveCloudConnection(
+    identity: CloudIdentity, connection: unknown, options: { requireExisting?: boolean } = {},
   ): Promise<void> {
     // Keep ownership after disconnect. Check and bind in ONE transaction so
     // concurrent authorization in two tabs cannot associate two accounts.
     const tx = this.db.transaction('settings', 'readwrite');
-    const owner = await tx.store.get('dropbox-journal-owner') as { appKey: string; accountId: string } | undefined;
-    const previous = await tx.store.get('dropbox-connection') as { appKey: string; accountId: string } | undefined;
+    const owner = await readCloudOwner(tx.store);
+    const previous = await tx.store.get(connectionKey(identity.providerId));
     if (options.requireExisting && !previous) {
       await tx.done;
-      throw new Error('Dropbox was disconnected. Reconnect to continue syncing.');
+      throw new Error('Cloud storage was disconnected. Reconnect to continue syncing.');
     }
-    const bound = owner ?? previous; // Preserve connections made by older builds.
-    if (bound && (bound.accountId !== connection.accountId || bound.appKey !== connection.appKey)) {
+    if (owner && (owner.providerId !== identity.providerId || owner.accountId !== identity.accountId || owner.appId !== identity.appId)) {
       await tx.done;
-      throw new Error('This journal belongs to a different Dropbox account or app. Reconnect the original account, or use a separate browser profile for another journal. Your entries have not been uploaded.');
+      throw new Error('This journal belongs to a different cloud provider, account, or app. Reconnect the original account, or use a separate browser profile for another journal. Your entries have not been uploaded.');
     }
-    await tx.store.put({ appKey: connection.appKey, accountId: connection.accountId }, 'dropbox-journal-owner');
-    await tx.store.put(connection, 'dropbox-connection');
+    await tx.store.put(identity, CLOUD_OWNER);
+    if (identity.providerId === 'dropbox') {
+      // Older open clients still consult this binding. Preserve their guard.
+      await tx.store.put({ appKey: identity.appId, accountId: identity.accountId }, 'dropbox-journal-owner');
+    }
+    await tx.store.put(connection, connectionKey(identity.providerId));
     await tx.done;
   }
   close(): void { this.db.close(); }

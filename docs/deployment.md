@@ -2,11 +2,23 @@
 
 [Back to the README](../README.md)
 
-minijour builds into static HTML, CSS, JavaScript, icons, and WebAssembly. It needs HTTPS and no application server. Every user connects their own Dropbox account; the app key identifies the application, not a shared storage account.
+minijour builds into static HTML, CSS, JavaScript, icons, and WebAssembly. It needs HTTPS and no application server. Every user connects their own cloud account; provider app keys identify the application, not a shared storage account.
 
-## Configure Dropbox
+## Configure cloud providers
 
-**These steps are for the website operator—not for each journal user. Register the app once and reuse its key for later builds.** Visitors only connect their own Dropbox account and choose or enter their cloud password.
+Provider setup is a website-operator task. Register each provider's application once and supply its public configuration before building. Visitors see only configured providers, connect their own accounts, and choose or enter their cloud password. The frontend has no developer setup fields.
+
+| Implemented provider | Build variable |
+| --- | --- |
+| Dropbox | `VITE_DROPBOX_APP_KEY` |
+
+Copy `.env.example` to `.env` for local builds, or supply variables in CI. With no provider configured, cloud controls are hidden; local writing and ZIP backups still work. Configuration is part of the static build, so changes require rebuilding and deploying, followed by updating installed PWAs.
+
+Removing a provider from a deployment stops that build from opening its saved connection. Local entries, credentials, and account ownership remain on the device; restoring the original configuration allows sync to resume. A journal stays bound to its original provider, application, and account to prevent accidental uploads elsewhere. Replacing an app key is not a migration to a new app.
+
+Dropbox is currently the only implementation. Google Drive and OneDrive are possible future integrations; no configuration for them is available yet. See [adding a provider](development.md#add-a-cloud-provider).
+
+### Dropbox
 
 Register one app in the [Dropbox App Console](https://www.dropbox.com/developers/apps):
 
@@ -18,7 +30,7 @@ Register one app in the [Dropbox App Console](https://www.dropbox.com/developers
 
 The app key is public and included in the browser build. Never put an app secret, access token, or refresh token in a `VITE_` variable. Authorization uses code flow with SHA-256 PKCE and state validation. Tokens stay on the authorizing device and refresh automatically.
 
-With a configured key, visitors choose **Connect Dropbox**, then create or enter their cloud password. Developer fields are hidden. Builds without a key explain that the site operator has not configured Dropbox; manual fields stay collapsed under **Self-hosting and developer setup**. A manually entered key applies only to that browser. To configure the website for all visitors, set `VITE_DROPBOX_APP_KEY` at build time and redeploy. Use the same app key and Dropbox account on devices that should share a journal.
+With a configured key, visitors choose **Connect Dropbox**, then create or enter their cloud password. Devices sharing a journal use the same website configuration and Dropbox account.
 
 Dropbox permits HTTP OAuth redirects for `localhost`, for example `http://localhost:5173/journal/`. Use HTTPS on actual devices: HTTP LAN addresses do not provide the secure context required by installation and other browser APIs.
 

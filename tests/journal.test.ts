@@ -9,6 +9,10 @@ import { DropboxFiles } from '../src/sync/dropbox';
 import { MemoryCloud } from './helpers';
 
 const DATE = '2026-10-24';
+function saveConnection(journal: Journal, value: { appKey: string; accountId: string }, options = {}) {
+  return journal.local.saveCloudConnection({ providerId: 'dropbox', appId: value.appKey, accountId: value.accountId }, value, options);
+}
+
 const stores: LocalStore[] = [];
 const journals: Journal[] = [];
 async function device(name = crypto.randomUUID()) {
@@ -67,7 +71,7 @@ describe('Automerge journal model', () => {
 describe('Dropbox-shaped file sync', () => {
   it('forgets connection and remembered key together, and rejects an unlock finishing after disconnect', async () => {
     const journal = await device();
-    await journal.local.saveDropboxConnection({ appKey: 'app', accountId: 'original' });
+    await saveConnection(journal, { appKey: 'app', accountId: 'original' });
     await journal.local.rememberVaultKey({ key: 'test-key' });
     await Promise.all([
       journal.local.rememberVaultKey({ key: 'finishing-unlock' }),
@@ -81,14 +85,14 @@ describe('Dropbox-shaped file sync', () => {
   it('retains journal ownership after disconnect and rejects another account before saving its tokens', async () => {
     const journal = await device();
     const original = { appKey: 'app', accountId: 'original' };
-    await journal.local.saveDropboxConnection(original);
+    await saveConnection(journal, original);
     await DropboxFiles.disconnect(journal.local);
-    await expect(journal.local.saveDropboxConnection({ appKey: 'app', accountId: 'other' })).rejects.toThrow('different Dropbox account');
+    await expect(saveConnection(journal, { appKey: 'app', accountId: 'other' })).rejects.toThrow('different cloud provider');
     expect(await journal.local.setting('dropbox-connection')).toBeUndefined();
     // A late token refresh from another tab cannot undo a disconnect.
-    await expect(journal.local.saveDropboxConnection(original, { requireExisting: true })).rejects.toThrow('disconnected');
+    await expect(saveConnection(journal, original, { requireExisting: true })).rejects.toThrow('disconnected');
     expect(await journal.local.setting('dropbox-connection')).toBeUndefined();
-    await journal.local.saveDropboxConnection(original);
+    await saveConnection(journal, original);
     expect(await journal.local.setting('dropbox-connection')).toEqual(original);
   });
 
@@ -97,15 +101,15 @@ describe('Dropbox-shaped file sync', () => {
     await journal.local.setSetting('dropbox-connection', { appKey: 'app', accountId: 'legacy' });
     await DropboxFiles.open(journal.local);
     await DropboxFiles.disconnect(journal.local);
-    await expect(journal.local.saveDropboxConnection({ appKey: 'app', accountId: 'other' })).rejects.toThrow();
+    await expect(saveConnection(journal, { appKey: 'app', accountId: 'other' })).rejects.toThrow();
 
     const fresh = await device();
     const attempts = await Promise.allSettled([
-      fresh.local.saveDropboxConnection({ appKey: 'app', accountId: 'first' }),
-      fresh.local.saveDropboxConnection({ appKey: 'app', accountId: 'second' }),
+      saveConnection(fresh, { appKey: 'app', accountId: 'first' }),
+      saveConnection(fresh, { appKey: 'app', accountId: 'second' }),
     ]);
     expect(attempts.map(result => result.status)).toEqual(['fulfilled', 'rejected']);
-    await expect(fresh.local.saveDropboxConnection({ appKey: 'other-app', accountId: 'first' })).rejects.toThrow();
+    await expect(saveConnection(fresh, { appKey: 'other-app', accountId: 'first' })).rejects.toThrow();
   });
 
   it('merges offline changes and converges without overwriting writers', async () => {

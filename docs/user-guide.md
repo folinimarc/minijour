@@ -8,7 +8,7 @@ Choose **Open journal** from the information page, or open `/journal/` directly.
 
 Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have inline previews; their Markdown links remain editable.
 
-Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **…** for Dropbox, backups, and installation information.
+Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **…** for cloud sync, backups, and installation information.
 
 ## Install
 
@@ -22,11 +22,11 @@ Choose the **minijour** wordmark in the journal to return to the information pag
 
 The app focuses the editor on opening. Browsers control whether that raises the on-screen keyboard; an additional tap may be needed.
 
-## Connect your Dropbox
+## Cloud sync
 
-On a configured deployment, choose **Connect Dropbox**, sign in to your own Dropbox account, and authorize minijour. Choose a cloud password of at least 12 characters, or enter your existing cloud password. You do not need a Dropbox developer account. On another device, visit the same site and connect the same Dropbox account and unlock with the same cloud password.
+Settings lists the cloud providers available on the website you use. Dropbox is currently supported. Choose **Connect Dropbox**, sign in to your own account, and authorize minijour. Choose a cloud password of at least 12 characters, or enter your existing cloud password. On another device, visit the same site, connect the same account, and unlock with the same cloud password.
 
-If settings says **Dropbox sync hasn’t been configured for this website**, its operator needs to enable the integration. You do not need to register a Dropbox app. You can keep writing and downloading backups. The collapsed **Self-hosting and developer setup** section is for people running the website; operators can follow the [deployment guide](deployment.md#configure-dropbox).
+If no cloud providers are available, settings shows only local features. You can keep writing offline and downloading ZIP backups.
 
 Unlocking combines local entries with the journal in your Dropbox app folder. Sync runs after edits settle, when opening/returning online, and every 30 seconds while visible. Check the saved status before switching devices if you need your latest edit immediately. Uploads cannot be guaranteed while the app is closed or suspended.
 
@@ -34,13 +34,13 @@ The password is never sent to Dropbox. There is no password reset: store it safe
 
 **Remember the key on this device** saves a non-exportable encryption key in the browser database. Otherwise, reopening requires the cloud password to resume sync. Writing locally works while cloud access is locked. **Lock cloud** forgets the saved key and stops cloud sync in the current tab; other open tabs retain their own unlocked sessions. **Disconnect** also removes this device's Dropbox connection.
 
-If the app finds files from an older, unencrypted version, settings shows **Import older Dropbox files**. This explicitly copies missing entries and photos into the current journal, then syncs them encrypted. It leaves the older files and Dropbox version history in place. Remove those separately in Dropbox if needed; encryption cannot retroactively protect copies already uploaded.
+If the app finds files from an older, unencrypted version, settings shows **Import older cloud files**. This explicitly copies missing entries and photos into the current journal, then syncs them encrypted. It leaves the older files and Dropbox version history in place. Remove those separately in Dropbox if needed; encryption cannot retroactively protect copies already uploaded.
 
-Disconnecting preserves local and remote entries. The journal remains bound to that Dropbox account and application; reconnecting a different account is blocked before any journal data transfers. Use separate browser profiles for separate accounts.
+Disconnecting preserves local and remote entries. The journal remains bound to its cloud provider, account, and application; connecting a different one is blocked before any journal data transfers. Use separate browser profiles for separate accounts.
 
 ## Storage and privacy
 
-- **On the device:** IndexedDB holds text, photos, settings, and the Dropbox connection. Browser profiles have separate local storage.
+- **On the device:** IndexedDB holds text, photos, settings, and the cloud connection. Browser profiles have separate local storage.
 - **In Dropbox, when connected:** Encrypted Automerge documents and photos live in your own app folder. Other users have independent folders in their accounts.
 - **On the website host:** the host serves application files. The app does not upload journals or Dropbox tokens to a minijour server. Hosting providers may keep normal access logs. The browser communicates directly with Dropbox.
 
@@ -50,13 +50,13 @@ The local database and exported backups are **not encrypted by minijour**. A rem
 
 There is no analytics, advertising, or external font loading. You trust the code served by the website you use. Tokens stay on the device and are excluded from backups. You can revoke authorization in your Dropbox account settings.
 
-Without Dropbox or an exported backup, clearing browser data or losing the device loses the journal. The app requests persistent storage after your first edit, but permission can be denied. If a local save fails, pending edits remain in memory: download a backup before closing.
+Without cloud sync or an exported backup, clearing browser data or losing the device loses the journal. The app requests persistent storage after your first edit, but permission can be denied. If a local save fails, pending edits remain in memory: download a backup before closing.
 
 ## Clean up unused photos
 
 Removing a photo link from Markdown keeps its file available for undo. Choose **… → Clean up unused photos** to review the number of unused photos and their size. Nothing is removed until you choose **Permanently delete photos**; **Cancel** keeps them.
 
-Cleanup checks references across all days, and rechecks after confirmation. A photo still used anywhere is kept. A journal linked to Dropbox requires an online connection and unlocked access to its original account, including after disconnecting. It syncs before each review and deletion. A journal never linked to Dropbox can be cleaned up offline.
+Cleanup checks references across all days, and rechecks after confirmation. A photo still used anywhere is kept. A journal linked to cloud storage requires an online connection and unlocked access to its original account, including after disconnecting. It syncs before each review and deletion. A journal never linked to cloud storage can be cleaned up offline.
 
 Permanent deletion removes photo files locally and from the current encrypted Dropbox folder. Small encrypted deletion records remain so other devices remove their copies on sync and do not upload them again. Interrupted cloud cleanup retries. Old backups cannot restore a permanently deleted photo into a journal that already knows about its deletion.
 
