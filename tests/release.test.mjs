@@ -1,0 +1,74 @@
+import { afterEach, expect, it } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { unzipSync, strFromU8 } from 'fflate';
+import { checkRelease } from '../scripts/check-release.mjs';
+import { buildInfo } from '../scripts/build-info.mjs';
+
+const pkg = { version: '0.1.0' };
+const lock = { version: '0.1.0', packages: { '': { version: '0.1.0' } } };
+const changelog = '# Changes\n\n## Unreleased\n\n- Later work\n\n## 0.1.0 - 2026-10-24\n\n### Added\n\n- First journal.\n\n## 0.0.1 - 2026-10-01\n\n- Older work.\n';
+const temporary = [];
+afterEach(() => temporary.splice(0).forEach(path => rmSync(path, { recursive: true, force: true })));
+
+it('requires a matching version and extracts only the selected release notes', () => {
+  expect(checkRelease('v0.1.0', pkg, lock, changelog)).toEqual({ version: '0.1.0', notes: '### Added\n\n- First journal.' });
+  expect(() => checkRelease('v0.2.0', pkg, lock, changelog)).toThrow('versions must match');
+  expect(() => checkRelease('v0.1.0', pkg, { ...lock, version: '0.0.1' }, changelog)).toThrow('versions must match');
+  expect(() => checkRelease('v0.1.0', pkg, lock, '## Unreleased\n- Work')).toThrow('dated');
+  expect(() => checkRelease('v0.1.0', pkg, lock, '## 0.1.0 - 2026-10-24\n')).toThrow('describe');
+  expect(() => checkRelease('v01.1.0', pkg, lock, changelog)).toThrow('SemVer');
+});
+
+it('packages a tested build reproducibly with its exact source and rejects stale builds', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'minijour-release-'));
+  temporary.push(directory);
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+  const write = (path, content) => writeFileSync(join(directory, path), content);
+  git('init', '-q');
+  write('.gitignore', 'dist/\n.release/\n.env\n');
+  write('package.json', JSON.stringify(pkg));
+  write('package-lock.json', JSON.stringify(lock));
+  write('CHANGELOG.md', changelog);
+  write('LICENSE', readFileSync('LICENSE'));
+  write('README.md', 'Synthetic release fixture.');
+  git('add', '.');
+  git('-c', 'user.name=Release Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Fixture');
+  git('tag', 'v0.1.0');
+  const sourceCommit = git('rev-parse', 'HEAD');
+  mkdirSync(join(directory, 'dist'));
+  write('dist/index.html', '<p>Tested output</p>');
+  write('dist/LICENSE.txt', readFileSync('LICENSE'));
+  write('dist/THIRD_PARTY_NOTICES.txt', 'Synthetic dependency notices.');
+  write('dist/build.json', JSON.stringify({ version: '0.1.0', sourceCommit }));
+  write('.env', 'DO_NOT_PUBLISH=this-is-a-test');
+  const script = resolve('scripts/package-release.mjs');
+  const run = () => execFileSync(process.execPath, [script, 'v0.1.0'], { cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  run();
+  const checksums = readFileSync(join(directory, '.release/SHA256SUMS'), 'utf8');
+  run();
+  expect(readFileSync(join(directory, '.release/SHA256SUMS'), 'utf8')).toBe(checksums);
+  const site = unzipSync(readFileSync(join(directory, '.release/minijour-0.1.0-site.zip')));
+  expect(strFromU8(site['index.html'])).toContain('Tested output');
+  expect(strFromU8(site['LICENSE.txt'])).toContain('GNU GENERAL PUBLIC LICENSE');
+  const source = execFileSync('tar', ['-tzf', '.release/minijour-0.1.0-source.tar.gz'], { cwd: directory, encoding: 'utf8' });
+  expect(source).toContain('minijour-0.1.0/README.md');
+  expect(source).not.toContain('.env');
+  expect(source).not.toContain('dist/');
+  expect(source).toContain('source-revision.json');
+  const extracted = join(directory, 'extracted');
+  mkdirSync(extracted);
+  execFileSync('tar', ['-xzf', '.release/minijour-0.1.0-source.tar.gz', '-C', extracted], { cwd: directory });
+  // Copy to a directory outside the fixture repository to simulate a download.
+  const archiveDirectory = mkdtempSync(join(tmpdir(), 'minijour-downloaded-'));
+  temporary.push(archiveDirectory);
+  writeFileSync(join(archiveDirectory, 'package.json'), JSON.stringify(pkg));
+  writeFileSync(join(archiveDirectory, 'source-revision.json'), readFileSync(join(extracted, 'minijour-0.1.0/source-revision.json')));
+  expect(buildInfo(archiveDirectory).sourceCommit).toBe(sourceCommit);
+  write('dist/build.json', JSON.stringify({ version: '0.1.0', sourceCommit: 'stale' }));
+  expect(run).toThrow();
+  write('README.md', 'Uncommitted changes.');
+  expect(run).toThrow();
+});

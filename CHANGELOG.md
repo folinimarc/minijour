@@ -12,6 +12,9 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 - Automated coverage for persistence, offline reloads, date rollover, multi-tab updates, backups, and mocked Dropbox sync.
 - User, developer, deployment, and release guides, with GPL-3.0-only licensing.
 - A simple Dropbox connection flow on deployments with a configured app key.
+- CI for manual setup and hosted subdirectory builds, plus tag-based release and GitHub Pages deployment workflows.
+- Version/source details and GPL/dependency notices in the app and static build.
+- Reproducible site/source archives with checksums and validation against the release tag and changelog.
 
 ### Fixed
 

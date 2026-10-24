@@ -100,6 +100,14 @@ An exported `journal.md` can be read in Obsidian. **Editing that exported file d
 
 ## Checks
 
+GitHub Actions runs unit tests and production browser tests on pull requests and pushes to `main`. Its two configurations cover manual Dropbox setup at the root and a configured deployment at `/minijour/`. You can reproduce the latter with:
+
+```sh
+MINIJOUR_TEST_SUBDIRECTORY=1 VITE_DROPBOX_APP_KEY=testpublickey npm run test:browser
+```
+
+The key above is synthetic and browser tests mock Dropbox. The build includes version/source metadata and license notices. `scripts/build-info.mjs` supports Git checkouts and downloaded source archives; `scripts/notices.mjs` collects runtime dependency licenses from the lockfile's installed packages.
+
 ```sh
 npm test
 npx playwright install chromium

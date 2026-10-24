@@ -65,6 +65,11 @@ export function mountShell() {
         <button id="install-button" class="secondary-button" hidden>Install minijour</button>
         <p class="help">Dates follow your device’s local time. Day headings are automatic. Without Dropbox or an exported backup, clearing browser data removes your journal.</p>
       </section>
+      <section class="settings-section settings-small">
+        <h2>About minijour <span class="app-version">${__APP_VERSION__}</span></h2>
+        <p class="help">© 2026 folinimarc and contributors. Free software under <a href="./LICENSE.txt" target="_blank" rel="noopener noreferrer">GPL v3.0</a>, without warranty. You may redistribute it under that license.</p>
+        <p class="help"><a href="${__SOURCE_URL__}" target="_blank" rel="noopener noreferrer">Source for this build</a> · <a href="./THIRD_PARTY_NOTICES.txt" target="_blank" rel="noopener noreferrer">Dependency notices</a></p>
+      </section>
       <div class="dialog-footer">minijour <span>A place for the everyday.</span></div>
     </dialog>`;
   const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

@@ -11,7 +11,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "release:check": "node scripts/check-release.mjs",
+    "release:package": "node scripts/package-release.mjs"
   },
   "dependencies": {
     "@automerge/automerge": "^3.5.0",

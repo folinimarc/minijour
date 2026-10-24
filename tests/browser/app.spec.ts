@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 async function openJournal(page: Page) {
-  await page.goto('/');
+  await page.goto('./');
   await expect(page.locator('.cm-content').last()).toBeVisible();
 }
 
@@ -240,4 +240,19 @@ test('blocks a different Dropbox account without sending it any journal data', a
   await expect(page.locator('.cm-content')).toContainText('Keep this journal');
   mock.accountId = 'test-account';
   await connect(page);
+});
+
+test('identifies the version and serves licensing beside the installed app', async ({ page, request, baseURL }) => {
+  await openJournal(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  const build = await (await request.get(new URL('build.json', baseURL!).href)).json();
+  await expect(page.locator('.app-version')).toHaveText(build.version);
+  await expect(page.getByRole('link', { name: 'Source for this build' })).toHaveAttribute('href', build.sourceUrl);
+  expect(build.sourceCommit).toMatch(/^[a-f0-9]{40}$/);
+  const license = await request.get(new URL('LICENSE.txt', baseURL!).href);
+  expect(license.ok()).toBe(true);
+  expect(await license.text()).toContain('GNU GENERAL PUBLIC LICENSE');
+  const notices = await request.get(new URL('THIRD_PARTY_NOTICES.txt', baseURL!).href);
+  expect(notices.ok()).toBe(true);
+  expect(await notices.text()).toContain('@automerge/automerge@');
 });
