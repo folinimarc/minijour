@@ -28,7 +28,7 @@ If you see app-key setup fields, the deployment has not configured its Dropbox i
 
 The first connection combines local entries with the journal in your Dropbox app folder. Sync runs after edits settle, when opening/returning online, and every 30 seconds while visible. Check the saved status before switching devices if you need your latest edit immediately. Uploads cannot be guaranteed while the app is closed or suspended.
 
-Disconnecting preserves local and remote entries. For separate Dropbox accounts, use separate browser profiles so their local journals remain separate.
+Disconnecting preserves local and remote entries. The journal remains bound to that Dropbox account and application; reconnecting a different account is blocked before any journal data transfers. Use separate browser profiles for separate accounts.
 
 ## Storage and privacy
 

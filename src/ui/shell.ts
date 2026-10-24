@@ -38,11 +38,14 @@ export function mountShell() {
         <h2>${icon('cloud')}Dropbox sync</h2>
         <p id="connection-description">Your journal saves on this device. Connect Dropbox to keep writing across devices.</p>
         <div id="dropbox-setup">
+          <div id="dropbox-developer-setup">
           <label for="app-key">Dropbox app key</label>
           <input id="app-key" type="text" spellcheck="false" autocomplete="off" placeholder="Your public app key" />
           <p class="help">Create a scoped <strong>App folder</strong> app in the <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener noreferrer">Dropbox App Console</a>. Enable <code>files.metadata.read</code>, <code>files.content.read</code>, and <code>files.content.write</code>.</p>
           <label for="redirect-uri">OAuth redirect URI</label><input id="redirect-uri" readonly />
-          <p class="help">Add this exact address to your app’s redirect URIs. Use the same app key on each device. Connecting combines this device’s entries with your Dropbox journal.</p>
+          <p class="help">Add this exact address to your app’s redirect URIs. Use the same app key on each device.</p>
+          </div>
+          <p class="help">Connect your own Dropbox account. Local entries combine with your journal there. This browser’s journal stays associated with that account after disconnecting.</p>
           <button id="connect-button" class="primary-button">Connect Dropbox</button>
         </div>
         <div id="dropbox-connected" class="button-row" hidden>
@@ -58,7 +61,7 @@ export function mountShell() {
       </section>
       <section class="settings-section settings-small">
         <h2>Keep it close</h2>
-        <p>On your Pixel, open the browser menu and choose <strong>Add to home screen → Install</strong>. After the first visit, you can write offline.</p>
+        <p>Install from your browser’s menu, or choose <strong>Add to Home Screen</strong> from the Share menu. After the first visit and offline installation, you can write without a connection.</p>
         <button id="install-button" class="secondary-button" hidden>Install minijour</button>
         <p class="help">Dates follow your device’s local time. Day headings are automatic. Without Dropbox or an exported backup, clearing browser data removes your journal.</p>
       </section>
@@ -77,6 +80,7 @@ export function mountShell() {
     connect: get<HTMLButtonElement>('connect-button'), disconnect: get<HTMLButtonElement>('disconnect-button'),
     sync: get<HTMLButtonElement>('sync-button'), export: get<HTMLButtonElement>('export-button'),
     restore: get<HTMLButtonElement>('restore-button'), setup: get<HTMLDivElement>('dropbox-setup'),
+    developerSetup: get<HTMLDivElement>('dropbox-developer-setup'),
     connected: get<HTMLDivElement>('dropbox-connected'), connectionDescription: get<HTMLParagraphElement>('connection-description'),
     install: get<HTMLButtonElement>('install-button'), update: get<HTMLButtonElement>('update-button'),
   };

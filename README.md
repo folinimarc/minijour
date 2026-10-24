@@ -4,6 +4,8 @@ A small journal: open it, write Markdown, add a photo. Each new day appears belo
 
 minijour is an installable, offline-capable web app. It saves on your device first. Optional Dropbox sync combines edits across devices with [Automerge](https://automerge.org/). Each person connects their own Dropbox account. No minijour account or application server is required.
 
+<img src="docs/images/journal.png" width="320" alt="minijour showing a date heading and a short Markdown journal entry" />
+
 ## What it does
 
 - Opens at today's date, ready to write. Changes save automatically.

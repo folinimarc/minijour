@@ -65,5 +65,21 @@ export class LocalStore {
     await tx.store.delete(key);
     await tx.done;
   }
+
+  async saveDropboxConnection<T extends { appKey: string; accountId: string }>(connection: T): Promise<void> {
+    // Keep ownership after disconnect. Check and bind in ONE transaction so
+    // concurrent authorization in two tabs cannot associate two accounts.
+    const tx = this.db.transaction('settings', 'readwrite');
+    const owner = await tx.store.get('dropbox-journal-owner') as { appKey: string; accountId: string } | undefined;
+    const previous = await tx.store.get('dropbox-connection') as { appKey: string; accountId: string } | undefined;
+    const bound = owner ?? previous; // Preserve connections made by older builds.
+    if (bound && (bound.accountId !== connection.accountId || bound.appKey !== connection.appKey)) {
+      await tx.done;
+      throw new Error('This journal belongs to a different Dropbox account or app. Reconnect the original account, or use a separate browser profile for another journal. Your entries have not been uploaded.');
+    }
+    await tx.store.put({ appKey: connection.appKey, accountId: connection.accountId }, 'dropbox-journal-owner');
+    await tx.store.put(connection, 'dropbox-connection');
+    await tx.done;
+  }
   close(): void { this.db.close(); }
 }

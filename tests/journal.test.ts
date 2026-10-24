@@ -5,6 +5,7 @@ import { Journal } from '../src/domain/journal';
 import { LocalStore } from '../src/storage/local';
 import { exportJournal, importJournal } from '../src/storage/backup';
 import { SyncEngine } from '../src/sync/engine';
+import { DropboxFiles } from '../src/sync/dropbox';
 import type { CloudFiles, RemoteFile } from '../src/sync/cloud';
 
 const DATE = '2026-10-24';
@@ -83,6 +84,33 @@ describe('Automerge journal model', () => {
 });
 
 describe('Dropbox-shaped file sync', () => {
+  it('retains journal ownership after disconnect and rejects another account before saving its tokens', async () => {
+    const journal = await device();
+    const original = { appKey: 'app', accountId: 'original' };
+    await journal.local.saveDropboxConnection(original);
+    await DropboxFiles.disconnect(journal.local);
+    await expect(journal.local.saveDropboxConnection({ appKey: 'app', accountId: 'other' })).rejects.toThrow('different Dropbox account');
+    expect(await journal.local.setting('dropbox-connection')).toBeUndefined();
+    await journal.local.saveDropboxConnection(original);
+    expect(await journal.local.setting('dropbox-connection')).toEqual(original);
+  });
+
+  it('preserves ownership from legacy connections and serializes two competing authorizations', async () => {
+    const journal = await device();
+    await journal.local.setSetting('dropbox-connection', { appKey: 'app', accountId: 'legacy' });
+    await DropboxFiles.open(journal.local);
+    await DropboxFiles.disconnect(journal.local);
+    await expect(journal.local.saveDropboxConnection({ appKey: 'app', accountId: 'other' })).rejects.toThrow();
+
+    const fresh = await device();
+    const attempts = await Promise.allSettled([
+      fresh.local.saveDropboxConnection({ appKey: 'app', accountId: 'first' }),
+      fresh.local.saveDropboxConnection({ appKey: 'app', accountId: 'second' }),
+    ]);
+    expect(attempts.map(result => result.status)).toEqual(['fulfilled', 'rejected']);
+    await expect(fresh.local.saveDropboxConnection({ appKey: 'other-app', accountId: 'first' })).rejects.toThrow();
+  });
+
   it('merges offline changes and converges without overwriting writers', async () => {
     const cloud = new MemoryCloud();
     const phone = await device();

@@ -115,6 +115,8 @@ The checked-in app icons can be regenerated with `node scripts/generate-icons.mj
 
 ## Compatibility
 
+The first Dropbox connection binds the local journal to its account and app key. That binding survives disconnect. Ownership and the new connection are checked/stored atomically, including legacy connections from earlier builds. This blocks accidental cross-account uploads without deleting or automatically moving user data. Separate accounts use separate browser profiles.
+
 The app version, IndexedDB schema, Dropbox layout, and backup format are separate concerns. Do not rename the database, channel, or cloud root for routine releases. Older installed PWAs may keep running after deployment: test compatibility and migrations before changing persisted data.
 
 ## Contribute

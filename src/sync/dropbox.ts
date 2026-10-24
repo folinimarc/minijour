@@ -65,7 +65,7 @@ export async function finishDropboxConnection(local: LocalStore): Promise<boolea
       code_verifier: attempt.verifier, redirect_uri: attempt.redirectUri,
     }));
     if (!token.refresh_token || !token.account_id) throw new Error('Dropbox did not grant offline access. Please reconnect.');
-    await local.setSetting(CONNECTION, {
+    await local.saveDropboxConnection({
       appKey: attempt.appKey, accessToken: token.access_token, refreshToken: token.refresh_token,
       expiresAt: Date.now() + token.expires_in * 1000, accountId: token.account_id,
     } satisfies Connection);
@@ -84,6 +84,7 @@ export class DropboxFiles implements CloudFiles {
 
   static async open(local: LocalStore): Promise<DropboxFiles | undefined> {
     const connection = await local.setting<Connection>(CONNECTION);
+    if (connection) await local.saveDropboxConnection(connection);
     return connection ? new DropboxFiles(local, connection) : undefined;
   }
 
@@ -92,6 +93,10 @@ export class DropboxFiles implements CloudFiles {
   }
 
   private async token(): Promise<string> {
+    const active = await this.local.setting<Connection>(CONNECTION);
+    if (!active || active.accountId !== this.connection.accountId || active.appKey !== this.connection.appKey) {
+      throw new Error('Dropbox was disconnected in another tab. Reload to update this app.');
+    }
     if (Date.now() >= this.connection.expiresAt - 60_000) {
       this.refreshing ??= (async () => {
         const token = await tokenRequest(new URLSearchParams({
@@ -99,7 +104,9 @@ export class DropboxFiles implements CloudFiles {
           refresh_token: this.connection.refreshToken,
         }));
         this.connection = { ...this.connection, accessToken: token.access_token, expiresAt: Date.now() + token.expires_in * 1000 };
-        await this.local.setSetting(CONNECTION, this.connection);
+        // A disconnect during the refresh request must not restore a connection.
+        if (!await this.local.setting(CONNECTION)) throw new Error('Dropbox was disconnected. Reconnect to continue syncing.');
+        await this.local.saveDropboxConnection(this.connection);
       })().finally(() => { this.refreshing = undefined; });
       await this.refreshing;
     }

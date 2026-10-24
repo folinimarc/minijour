@@ -155,6 +155,7 @@ async function start(): Promise<void> {
   } });
   ui.dialog.addEventListener('close', () => { document.body.append(ui.notice); editors.get(activeDate)?.view.focus(); });
   ui.appKey.value = import.meta.env.VITE_DROPBOX_APP_KEY || await local.setting<string>('dropbox-app-key') || '';
+  ui.developerSetup.hidden = !!import.meta.env.VITE_DROPBOX_APP_KEY;
   ui.redirect.value = redirectUri();
   ui.setup.hidden = !!engine;
   ui.connected.hidden = !engine;
@@ -173,7 +174,7 @@ async function start(): Promise<void> {
     await DropboxFiles.disconnect(local);
     engine = undefined; syncError = false; lastSync = undefined;
     ui.setup.hidden = false; ui.connected.hidden = true;
-    ui.connectionDescription.textContent = 'Disconnected. Your journal stays on this device and in Dropbox.';
+    ui.connectionDescription.textContent = 'Disconnected. Your journal stays on this device and in Dropbox. Reconnect the same account to resume sync.';
     updateStatus();
   })().catch(notify); };
   ui.sync.onclick = () => { void sync(); };

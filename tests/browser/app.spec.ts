@@ -118,6 +118,8 @@ test('downloads a complete backup and restores it on a fresh device', async ({ p
 class DropboxMock {
   files = new Map<string, { bytes: Buffer; revision: string }>();
   revision = 0;
+  accountId = 'test-account';
+  apiCalls = 0;
   async install(context: BrowserContext) {
     await context.route('https://www.dropbox.com/oauth2/authorize?**', route => {
       const params = new URL(route.request().url()).searchParams;
@@ -130,9 +132,10 @@ class DropboxMock {
     await context.route('https://api.dropboxapi.com/oauth2/token', async route => {
       const params = new URLSearchParams(route.request().postData()!);
       expect(params.get('code_verifier')?.length).toBeGreaterThanOrEqual(43);
-      await route.fulfill({ json: { access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 14400, account_id: 'test-account' } });
+      await route.fulfill({ json: { access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 14400, account_id: this.accountId } });
     });
     await context.route(/https:\/\/(api|content)\.dropboxapi\.com\/2\//, async route => {
+      this.apiCalls++;
       const request = route.request();
       const endpoint = new URL(request.url()).pathname;
       const args = JSON.parse(request.headers()['dropbox-api-arg'] || request.postData() || '{}');
@@ -156,7 +159,8 @@ class DropboxMock {
 
 async function connect(page: Page) {
   await page.getByRole('button', { name: 'Settings and backup' }).click();
-  await page.getByLabel('Dropbox app key', { exact: true }).fill('testkey');
+  const appKey = page.getByLabel('Dropbox app key', { exact: true });
+  if (await appKey.isVisible()) await appKey.fill('testkey');
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
 }
@@ -200,4 +204,40 @@ test('connects Dropbox and merges offline changes across two browser devices', a
   await second.reload();
   await expect(second.locator('.photo-preview img')).toBeVisible();
   await phone.close(); await laptop.close();
+});
+
+test('configured deployments hide developer setup and use the shared public app key', async ({ page, context }) => {
+  test.skip(!process.env.VITE_DROPBOX_APP_KEY, 'Run with VITE_DROPBOX_APP_KEY to exercise a configured deployment.');
+  const mock = new DropboxMock();
+  await mock.install(context);
+  await openJournal(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await expect(page.getByLabel('Dropbox app key', { exact: true })).toBeHidden();
+  await expect(page.getByLabel('OAuth redirect URI')).toBeHidden();
+  const authorization = page.waitForRequest(request => request.url().startsWith('https://www.dropbox.com/oauth2/authorize?'));
+  await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
+  expect(new URL((await authorization).url()).searchParams.get('client_id')).toBe(process.env.VITE_DROPBOX_APP_KEY);
+  await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
+});
+
+test('blocks a different Dropbox account without sending it any journal data', async ({ page, context }) => {
+  const mock = new DropboxMock();
+  await mock.install(context);
+  await openJournal(page);
+  await page.keyboard.insertText('Keep this journal in its original account.');
+  await connect(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Connect Dropbox', exact: true })).toBeVisible();
+  const previousCalls = mock.apiCalls;
+  mock.accountId = 'another-account';
+  await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('different Dropbox account');
+  await expect(page.locator('.cm-content')).toContainText('Keep this journal');
+  expect(mock.apiCalls).toBe(previousCalls);
+  await page.reload();
+  await expect(page.getByRole('status')).toContainText('Saved on this device');
+  await expect(page.locator('.cm-content')).toContainText('Keep this journal');
+  mock.accountId = 'test-account';
+  await connect(page);
 });
