@@ -1,3 +1,5 @@
+import { appRoot } from '../urls';
+
 const icons = {
   book: '<path d="M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2V4Zm0 12h14M9 4v12"/>',
   camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.5"/>',
@@ -13,7 +15,7 @@ export function icon(name: keyof typeof icons): string {
 export function mountShell() {
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <header class="topbar">
-      <a class="wordmark" href="./" aria-label="minijour, your journal">${icon('book')}<span>minijour</span></a>
+      <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
       <div class="topbar-right">
         <span id="status" class="status" role="status"><span class="status-dot"></span><span id="status-text">Opening your journal…</span></span>
         <button id="settings-button" class="icon-button" aria-label="Settings and backup" title="Settings and backup">${icon('settings')}</button>
@@ -83,8 +85,8 @@ export function mountShell() {
       </section>
       <section class="settings-section settings-small">
         <h2>About minijour <span class="app-version">${__APP_VERSION__}</span></h2>
-        <p class="help">© 2026 folinimarc and contributors. Free software under <a href="./LICENSE.txt" target="_blank" rel="noopener noreferrer">GPL v3.0</a>, without warranty. You may redistribute it under that license.</p>
-        <p class="help"><a href="${__SOURCE_URL__}" target="_blank" rel="noopener noreferrer">Source for this build</a> · <a href="./THIRD_PARTY_NOTICES.txt" target="_blank" rel="noopener noreferrer">Dependency notices</a></p>
+        <p class="help">© 2026 folinimarc and contributors. Free software under <a href="${new URL('LICENSE.txt', appRoot).href}" target="_blank" rel="noopener noreferrer">GPL v3.0</a>, without warranty. You may redistribute it under that license.</p>
+        <p class="help"><a href="${__SOURCE_URL__}" target="_blank" rel="noopener noreferrer">Source for this build</a> · <a href="${new URL('THIRD_PARTY_NOTICES.txt', appRoot).href}" target="_blank" rel="noopener noreferrer">Dependency notices</a></p>
       </section>
       <div class="dialog-footer">minijour <span>A place for the everyday.</span></div>
     </dialog>`;

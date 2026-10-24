@@ -26,6 +26,10 @@ This project intentionally uses TypeScript and normal DOM elements instead of a 
 
 ```text
 src/
+  landing.ts          Small landing-page entry; no journal/database initialization
+  urls.ts             Shared root and journal links for both entry points
+  base.css            Shared colors, typography, and basic element styles
+  landing.css         Landing-page layout
   main.ts             Wires the application together and handles user actions
   domain/
     day.ts            Date helpers and Automerge document operations
@@ -44,7 +48,7 @@ src/
     shell.ts          Static application markup and element references
     editor.ts         CodeMirror editor and photo previews
     photos.ts         Image resizing and local display URLs
-  style.css           The interface's visual styles
+  style.css           Journal/editor visual styles
 ```
 
 If you're learning, follow this path:
@@ -54,6 +58,12 @@ If you're learning, follow this path:
 3. Follow a keystroke from `ui/editor.ts` through `main.ts` to `Journal.merge()`.
 4. Read `sync/cloud.ts`, then `sync/engine.ts`. The engine doesn't know about HTTP or OAuth.
 5. Read `crypto/vault.ts`, which wraps that file contract with encryption, then `sync/dropbox.ts` for HTTP/OAuth. Encryption stays outside the document and merge logic.
+
+### Pages and PWA launch
+
+Vite builds two HTML entries: `index.html` for the information page and `journal/index.html` for the editor. There is no client-side router and no server rewrite requirement. `VITE_BASE_PATH` defaults to `/`; set `/minijour/` for project Pages. It controls asset paths and the stable manifest ID. The PWA starts at `./journal/` relative to the manifest, and its scope remains the app root. Manifest `id` resolves against the origin, so it explicitly includes the deployment path to match older installations' identity.
+
+Both pages register the same service worker, which precaches both shells. Navigation fallback is limited to journal URLs, so a cached journal never replaces the landing page. The small landing entry forwards old root PWA launches and OAuth callbacks; `#about` lets installed users deliberately view the landing page. Shared URLs resolve relative to the entry module, keeping links correct in development and built subdirectory deployments. IndexedDB's name and schema stay unchanged.
 
 ### The data model
 

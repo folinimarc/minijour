@@ -3,7 +3,7 @@ import { createDay, editDay } from '../../src/domain/day';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 async function openJournal(page: Page) {
-  await page.goto('./');
+  await page.goto('./journal/');
   await expect(page.locator('.cm-content').last()).toBeVisible();
 }
 
@@ -122,6 +122,7 @@ class DropboxMock {
   revision = 0;
   accountId = 'test-account';
   apiCalls = 0;
+  tokenRedirects: string[] = [];
   async install(context: BrowserContext) {
     await context.route('https://www.dropbox.com/oauth2/authorize?**', route => {
       const params = new URL(route.request().url()).searchParams;
@@ -133,6 +134,7 @@ class DropboxMock {
     });
     await context.route('https://api.dropboxapi.com/oauth2/token', async route => {
       const params = new URLSearchParams(route.request().postData()!);
+      this.tokenRedirects.push(params.get('redirect_uri')!);
       expect(params.get('code_verifier')?.length).toBeGreaterThanOrEqual(43);
       await route.fulfill({ json: { access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 14400, account_id: this.accountId } });
     });
@@ -350,4 +352,16 @@ test('imports older plaintext Dropbox entries and photos explicitly without modi
   expect(mock.files.get(path)!.bytes).toEqual(original);
   expect([...mock.files.keys()].filter(name => name.startsWith('/minijour-v1/'))).toHaveLength(2);
   expect([...mock.files.keys()].some(name => name.startsWith('/minijour-encrypted-v1/objects/'))).toBe(true);
+});
+
+test('finishes a sign-in started by an older app at the root redirect URI', async ({ page, context, baseURL }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await page.goto('./');
+  await page.evaluate(redirectUri => sessionStorage.setItem('minijour-oauth', JSON.stringify({
+    appKey: 'testkey', verifier: 'v'.repeat(64), state: 'old-state', redirectUri,
+  })), baseURL!);
+  await page.goto('./?code=old-code&state=old-state');
+  await expect(page).toHaveURL(/\/journal\/$/);
+  await unlock(page);
+  expect(mock.tokenRedirects).toEqual([baseURL]);
 });

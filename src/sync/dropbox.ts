@@ -1,3 +1,4 @@
+import { journalUrl } from '../urls';
 import type { LocalStore } from '../storage/local';
 import type { CloudFiles, RemoteFile } from './cloud';
 
@@ -24,7 +25,7 @@ function base64url(bytes: Uint8Array): string {
 }
 
 export function redirectUri(): string {
-  return `${location.origin}${location.pathname}`;
+  return journalUrl.href;
 }
 
 export async function connectDropbox(appKey: string): Promise<void> {

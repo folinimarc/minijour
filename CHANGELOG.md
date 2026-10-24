@@ -6,6 +6,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Added
 
+- A plain-language landing page, a dedicated `/journal/` page, and direct-to-writing PWA launch with offline navigation between both.
 - Password-protected Dropbox sync with Argon2id and AES-GCM encryption of text, editing history, photos, and filenames.
 - Optional remembered device keys, cloud locking, and explicit import of older unencrypted Dropbox data.
 

@@ -46,7 +46,7 @@ The release workflow validates the tag against the package and changelog, runs t
 
 Currently publication accepts stable `vMAJOR.MINOR.PATCH` tags; prerelease tags are rejected. Finish one release workflow before pushing the next release tag.
 
-Before the first tag, configure Pages and the public Dropbox app key using the deployment guide. Automation uses GitHub's repository token permissions for release assets and Pages; it needs no personal access token or Dropbox secret.
+Before the first tag, configure Pages, the deployment base path, and the public Dropbox app key using the deployment guide. Automation uses GitHub's repository token permissions for release assets and Pages; it needs no personal access token or Dropbox secret.
 
 Published assets identify the version and exact source revision. Preserve GPL licensing, dependency notices, and corresponding source alongside the static archive. Never publish local profiles, credentials, journal backups, or test artifacts as release assets.
 

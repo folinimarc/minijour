@@ -4,7 +4,7 @@
 
 ## Write
 
-Open minijour. Today's local date is prepared, with the cursor at the end. Type Markdown; changes save automatically. Dates follow your device's timezone. A new section appears at midnight or when you return after the date changes.
+Choose **Open journal** from the information page, or open `/journal/` directly. Installed apps launch straight into the journal. Today's local date is prepared, with the cursor at the end. Type Markdown; changes save automatically. Dates follow your device's timezone. A new section appears at midnight or when you return after the date changes.
 
 Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have inline previews; their Markdown links remain editable.
 
@@ -17,6 +17,8 @@ Visit the HTTPS website online once and allow offline installation to complete.
 - **Android / Chrome:** open the browser menu and choose **Add to home screen → Install**. You can also use **Install minijour** in settings if offered.
 - **iPhone / iPad / Safari:** use the Share menu and **Add to Home Screen**. This platform still needs real-device verification for minijour.
 - **Desktop:** use the browser's installation option if available, or bookmark the website.
+
+Choose the **minijour** wordmark in the journal to return to the information page.
 
 The app focuses the editor on opening. Browsers control whether that raises the on-screen keyboard; an additional tap may be needed.
 

@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
 const subdirectory = process.env.MINIJOUR_TEST_SUBDIRECTORY === '1';
-const baseURL = subdirectory ? 'http://127.0.0.1:4173/minijour/' : 'http://127.0.0.1:4173/';
+const basePath = process.env.VITE_BASE_PATH || (subdirectory ? '/minijour/' : '/');
+const baseURL = `http://127.0.0.1:4173${basePath}`;
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -13,9 +14,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: subdirectory
-      ? 'npm run build && npm run preview -- --port 4173 --strictPort --base=/minijour/'
-      : 'npm run build && npm run preview -- --port 4173 --strictPort',
+    env: { VITE_BASE_PATH: basePath },
+    command: 'npm run build && npm run preview -- --port 4173 --strictPort',
     url: baseURL,
     reuseExistingServer: false,
     timeout: 60_000,
