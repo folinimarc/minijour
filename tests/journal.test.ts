@@ -91,6 +91,9 @@ describe('Dropbox-shaped file sync', () => {
     await DropboxFiles.disconnect(journal.local);
     await expect(journal.local.saveDropboxConnection({ appKey: 'app', accountId: 'other' })).rejects.toThrow('different Dropbox account');
     expect(await journal.local.setting('dropbox-connection')).toBeUndefined();
+    // A late token refresh from another tab cannot undo a disconnect.
+    await expect(journal.local.saveDropboxConnection(original, { requireExisting: true })).rejects.toThrow('disconnected');
+    expect(await journal.local.setting('dropbox-connection')).toBeUndefined();
     await journal.local.saveDropboxConnection(original);
     expect(await journal.local.setting('dropbox-connection')).toEqual(original);
   });

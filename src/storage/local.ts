@@ -66,12 +66,18 @@ export class LocalStore {
     await tx.done;
   }
 
-  async saveDropboxConnection<T extends { appKey: string; accountId: string }>(connection: T): Promise<void> {
+  async saveDropboxConnection<T extends { appKey: string; accountId: string }>(
+    connection: T, options: { requireExisting?: boolean } = {},
+  ): Promise<void> {
     // Keep ownership after disconnect. Check and bind in ONE transaction so
     // concurrent authorization in two tabs cannot associate two accounts.
     const tx = this.db.transaction('settings', 'readwrite');
     const owner = await tx.store.get('dropbox-journal-owner') as { appKey: string; accountId: string } | undefined;
     const previous = await tx.store.get('dropbox-connection') as { appKey: string; accountId: string } | undefined;
+    if (options.requireExisting && !previous) {
+      await tx.done;
+      throw new Error('Dropbox was disconnected. Reconnect to continue syncing.');
+    }
     const bound = owner ?? previous; // Preserve connections made by older builds.
     if (bound && (bound.accountId !== connection.accountId || bound.appKey !== connection.appKey)) {
       await tx.done;

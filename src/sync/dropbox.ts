@@ -84,7 +84,7 @@ export class DropboxFiles implements CloudFiles {
 
   static async open(local: LocalStore): Promise<DropboxFiles | undefined> {
     const connection = await local.setting<Connection>(CONNECTION);
-    if (connection) await local.saveDropboxConnection(connection);
+    if (connection) await local.saveDropboxConnection(connection, { requireExisting: true });
     return connection ? new DropboxFiles(local, connection) : undefined;
   }
 
@@ -105,8 +105,7 @@ export class DropboxFiles implements CloudFiles {
         }));
         this.connection = { ...this.connection, accessToken: token.access_token, expiresAt: Date.now() + token.expires_in * 1000 };
         // A disconnect during the refresh request must not restore a connection.
-        if (!await this.local.setting(CONNECTION)) throw new Error('Dropbox was disconnected. Reconnect to continue syncing.');
-        await this.local.saveDropboxConnection(this.connection);
+        await this.local.saveDropboxConnection(this.connection, { requireExisting: true });
       })().finally(() => { this.refreshing = undefined; });
       await this.refreshing;
     }
