@@ -365,3 +365,46 @@ test('finishes a sign-in started by an older app at the root redirect URI', asyn
   await unlock(page);
   expect(mock.tokenRedirects).toEqual([baseURL]);
 });
+
+test('does not remember a key when another tab disconnects during unlock', async ({ page, context }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page); await connect(page);
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Lock cloud', exact: true }).click();
+  const other = await context.newPage(); await openJournal(other);
+  await other.getByRole('button', { name: 'Settings and backup' }).click();
+  await expect(other.getByRole('button', { name: 'Unlock cloud', exact: true })).toBeEnabled();
+
+  let release!: () => void;
+  let reached!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const waiting = new Promise<void>(resolve => { reached = resolve; });
+  let reads = 0;
+  await context.route('https://content.dropboxapi.com/2/files/download', async route => {
+    const args = JSON.parse(route.request().headers()['dropbox-api-arg']);
+    // Pause the final header check after key derivation but before remembering.
+    if (route.request().frame().page() === page && args.path.endsWith('/vault.json') && ++reads === 2) {
+      reached(); await held;
+      await route.fulfill({ body: mock.files.get(args.path)!.bytes, contentType: 'application/octet-stream' });
+    } else await route.fallback();
+  });
+  await page.getByLabel('Cloud password', { exact: true }).fill(PASSWORD);
+  await page.getByLabel('Remember the key on this device').check();
+  await page.getByRole('button', { name: 'Unlock cloud', exact: true }).click();
+  await waiting;
+  await other.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(other.getByRole('button', { name: 'Connect Dropbox', exact: true })).toBeVisible();
+  release();
+  await expect(page.getByRole('alert')).toContainText('Dropbox was disconnected');
+  const key = await page.evaluate(() => new Promise<unknown>((resolve, reject) => {
+    const open = indexedDB.open('minijour-v1');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const request = db.transaction('settings').objectStore('settings').get('cloud-vault-key');
+      request.onsuccess = () => { db.close(); resolve(request.result); };
+      request.onerror = () => reject(request.error);
+    };
+  }));
+  expect(key).toBeUndefined();
+});

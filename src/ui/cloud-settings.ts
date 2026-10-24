@@ -1,10 +1,9 @@
 import { EncryptedFiles, type RememberedVault } from '../crypto/vault';
 import type { Journal } from '../domain/journal';
+import { VAULT_KEY_SETTING } from '../storage/local';
 import { connectDropbox, DropboxFiles, redirectUri } from '../sync/dropbox';
 import { SyncEngine } from '../sync/engine';
 import type { mountShell } from './shell';
-
-const REMEMBERED = 'cloud-vault-key';
 
 /** Owns connection/unlock controls. Writing and local storage never depend on it. */
 export async function setupCloudSettings(
@@ -51,7 +50,7 @@ export async function setupCloudSettings(
     if (!cloud) return;
     header = await EncryptedFiles.inspect(cloud);
     inspected = true;
-    const saved = await local.setting<RememberedVault>(REMEMBERED);
+    const saved = await local.setting<RememberedVault>(VAULT_KEY_SETTING);
     if (header) {
       const vault = EncryptedFiles.remembered(cloud, header, saved);
       if (vault) await use(vault);
@@ -80,8 +79,8 @@ export async function setupCloudSettings(
         const vault = current ? await EncryptedFiles.unlock(cloud, current, ui.password.value)
           : await EncryptedFiles.create(cloud, ui.password.value);
         header = await EncryptedFiles.inspect(cloud);
-        if (ui.remember.checked) await local.setSetting(REMEMBERED, { descriptor: vault.descriptor, key: vault.key });
-        else await local.removeSetting(REMEMBERED);
+        if (ui.remember.checked) await local.rememberVaultKey({ descriptor: vault.descriptor, key: vault.key });
+        else await local.removeSetting(VAULT_KEY_SETTING);
         await use(vault);
         ui.notice.hidden = true;
         await options.sync();
@@ -92,7 +91,7 @@ export async function setupCloudSettings(
     guard();
     working = true;
     try {
-      await local.removeSetting(REMEMBERED);
+      await local.removeSetting(VAULT_KEY_SETTING);
       unlocked = false; options.change();
     } finally { working = false; show(); }
   })().catch(options.notify); };
@@ -100,7 +99,6 @@ export async function setupCloudSettings(
     guard();
     working = true;
     try {
-      await local.removeSetting(REMEMBERED);
       await DropboxFiles.disconnect(local);
       cloud = undefined; header = undefined; unlocked = false; inspected = false;
       options.change(); ui.legacy.hidden = true;

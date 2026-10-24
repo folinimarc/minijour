@@ -89,6 +89,19 @@ describe('Automerge journal model', () => {
 });
 
 describe('Dropbox-shaped file sync', () => {
+  it('forgets connection and remembered key together, and rejects an unlock finishing after disconnect', async () => {
+    const journal = await device();
+    await journal.local.saveDropboxConnection({ appKey: 'app', accountId: 'original' });
+    await journal.local.rememberVaultKey({ key: 'test-key' });
+    await Promise.all([
+      journal.local.rememberVaultKey({ key: 'finishing-unlock' }),
+      DropboxFiles.disconnect(journal.local),
+    ]);
+    expect(await journal.local.setting('dropbox-connection')).toBeUndefined();
+    expect(await journal.local.setting('cloud-vault-key')).toBeUndefined();
+    await expect(journal.local.rememberVaultKey({ key: 'late-key' })).rejects.toThrow('disconnected');
+    expect(await journal.local.setting('cloud-vault-key')).toBeUndefined();
+  });
   it('retains journal ownership after disconnect and rejects another account before saving its tokens', async () => {
     const journal = await device();
     const original = { appKey: 'app', accountId: 'original' };

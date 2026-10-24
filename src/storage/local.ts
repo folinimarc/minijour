@@ -3,6 +3,7 @@ import * as A from '@automerge/automerge';
 import { loadDay, mergeDays } from '../domain/day';
 
 export type Photo = { name: string; blob: Blob };
+export const VAULT_KEY_SETTING = 'cloud-vault-key';
 
 interface Database extends DBSchema {
   days: { key: string; value: Uint8Array };
@@ -63,6 +64,25 @@ export class LocalStore {
   async removeSetting(key: string): Promise<void> {
     const tx = this.db.transaction('settings', 'readwrite');
     await tx.store.delete(key);
+    await tx.done;
+  }
+
+  async rememberVaultKey(value: unknown): Promise<void> {
+    // A password derivation can finish after another tab disconnects. Check
+    // the connection and save in one transaction, so it cannot restore a key.
+    const tx = this.db.transaction('settings', 'readwrite');
+    if (!await tx.store.get('dropbox-connection')) {
+      await tx.done;
+      throw new Error('Dropbox was disconnected. Reconnect before remembering the cloud key.');
+    }
+    await tx.store.put(value, VAULT_KEY_SETTING);
+    await tx.done;
+  }
+
+  async disconnectDropbox(): Promise<void> {
+    const tx = this.db.transaction('settings', 'readwrite');
+    await tx.store.delete('dropbox-connection');
+    await tx.store.delete(VAULT_KEY_SETTING);
     await tx.done;
   }
 

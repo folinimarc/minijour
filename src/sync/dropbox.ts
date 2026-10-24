@@ -1,6 +1,6 @@
 import { journalUrl } from '../urls';
 import type { LocalStore } from '../storage/local';
-import type { CloudFiles, RemoteFile } from './cloud';
+import type { VaultStorage, RemoteFile } from './cloud';
 
 type Connection = {
   appKey: string;
@@ -79,7 +79,7 @@ export async function finishDropboxConnection(local: LocalStore): Promise<boolea
 }
 
 /** A thin Dropbox API adapter. Dropbox stores bytes; Automerge merges them. */
-export class DropboxFiles implements CloudFiles {
+export class DropboxFiles implements VaultStorage {
   private refreshing?: Promise<void>;
   private constructor(private local: LocalStore, private connection: Connection, private root = ROOT) {}
 
@@ -92,7 +92,7 @@ export class DropboxFiles implements CloudFiles {
   }
 
   static async disconnect(local: LocalStore): Promise<void> {
-    await local.removeSetting(CONNECTION);
+    await local.disconnectDropbox();
   }
 
   private async token(): Promise<string> {

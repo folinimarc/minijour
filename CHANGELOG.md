@@ -23,5 +23,6 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 ### Fixed
 
 - Block connecting a local journal to another Dropbox account or app, including after disconnecting, to prevent accidental cross-account uploads.
+- Prevent a pending unlock in another tab from restoring a remembered encryption key after Dropbox disconnects.
 
 No release has been published yet. The first intended version is 0.1.0.
