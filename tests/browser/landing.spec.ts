@@ -10,7 +10,6 @@ test('explains the app without opening a local journal and links to the editor',
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Simple, private journaling.');
   await expect(page.getByRole('region', { name: 'How minijour works' })).toContainText('encrypted backup and sync');
   await expect(page.getByText('No sign-up. Install for offline writing.', { exact: true })).toBeInViewport();
-  await expect(page.locator('#journal-mark svg')).toBeVisible();
   await expect(page.getByRole('link', { name: 'About your data' })).toHaveCount(0);
   await expect(page.locator('.cm-content')).toHaveCount(0);
   expect(await page.evaluate(() => indexedDB.databases())).toEqual([]);

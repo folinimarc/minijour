@@ -77,7 +77,7 @@ export function mountShell() {
         <div class="button-row"><button id="export-button" class="secondary-button">Download backup</button><button id="restore-button" class="text-button">Restore backup</button></div>
       </section>
       <section class="settings-section settings-small">
-        <h2>Photo storage</h2>
+        <h2>Clean up unused photos</h2>
         <p>Removing a photo link does not remove the photo file. Clean up files that no entry uses below.</p>
         <button id="review-photos-button" class="secondary-button">Clean up unused photos</button>
         <div id="photo-cleanup-review" hidden>

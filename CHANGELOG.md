@@ -13,7 +13,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 - Explain local-only storage in a dismissible banner with remembered device-local preference, and simplify settings around connecting your own cloud and installing for offline writing.
 - Use the journal logo as the favicon on both pages.
 - Use the journal's book logo and wordmark styling on the landing page as well.
-- Refocus the landing page on simple, private daily writing, optional use of your own cloud, and installation for offline access. Make the no-sign-up message prominent and replace the sample journal with the logo.
+- Refocus the landing page on simple, private daily writing, optional use of your own cloud, and installation for offline access. Make the no-sign-up message prominent and remove the sample journal.
 - Keep the journal header visible while scrolling and open at the end of today's entry.
 - Show entries newest first, with only today expanded on opening and older editors created when needed. Sidebar navigation collapses other entries. Go to today and Add date buttons sit above the date list, which keeps every date in newest-first order.
 - Place labeled Dates and Settings buttons together and clarify encrypted cloud storage, device sync, and photo cleanup after entry deletion.

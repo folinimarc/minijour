@@ -13,7 +13,6 @@ if (params.has('code') || params.has('error') || (standalone && location.hash !=
   location.replace(`${journalUrl.href}${location.search}${location.hash}`);
 } else {
   document.querySelector('.wordmark')!.insertAdjacentHTML('afterbegin', icon('book'));
-  document.querySelector('#journal-mark')!.innerHTML = icon('book');
   document.querySelector<HTMLAnchorElement>('#source-link')!.href = __SOURCE_URL__;
   // Visiting the information page also prepares the journal for offline use.
   // Updates stay waiting until the journal's normal update prompt is accepted.
