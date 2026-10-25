@@ -4,9 +4,12 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+## 0.2.1 - 2026-10-25
+
 ### Fixed
 
-- Remove headings and sidebar links for dates cleared on another device, including previously opened dates. Keep local undo, today’s draft, and unfinished keyboard input intact.
+- Remove date headings and sidebar links immediately when an entry is deleted on another device, including dates previously opened or collapsed. No reload is needed.
+- Preserve local undo, today’s empty draft, and unfinished keyboard input when applying synced deletions.
 
 ## 0.2.0 - 2026-10-25
 
