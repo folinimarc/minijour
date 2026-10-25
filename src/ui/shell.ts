@@ -16,15 +16,16 @@ export function mountShell() {
     <main id="journal" aria-label="Your journal" aria-busy="true"></main>
     <dialog id="date-sidebar" class="date-sidebar" aria-labelledby="dates-title">
       <div class="dialog-header"><h1 id="dates-title">Dates</h1><button id="close-dates" class="icon-button" aria-label="Close dates">${icon('close')}</button></div>
+      <div class="date-actions button-row">
+        <button id="today-button" class="secondary-button">Go to today</button>
+        <button id="add-date-button" class="secondary-button" aria-expanded="false" aria-controls="date-form">Add date</button>
+      </div>
+      <form id="date-form" class="add-date" hidden>
+        <label for="entry-date">Entry date</label>
+        <input id="entry-date" type="date" required />
+        <button class="secondary-button" type="submit">Open date</button>
+      </form>
       <nav aria-label="Journal dates"><ul id="date-list" class="date-list"></ul></nav>
-      <details class="add-date">
-        <summary>Add a date</summary>
-        <form id="date-form">
-          <label for="entry-date">Entry date</label>
-          <input id="entry-date" type="date" required />
-          <button class="secondary-button" type="submit">Open date</button>
-        </form>
-      </details>
     </dialog>
     <div class="photo-tools">
       <div id="photo-menu" class="photo-menu" role="group" aria-label="Add a photo" hidden>
@@ -107,6 +108,7 @@ export function mountShell() {
     restore: get<HTMLButtonElement>('restore-button'),
     datesButton: get<HTMLButtonElement>('dates-button'), dateSidebar: get<HTMLDialogElement>('date-sidebar'),
     closeDates: get<HTMLButtonElement>('close-dates'), dateList: get<HTMLUListElement>('date-list'),
+    todayButton: get<HTMLButtonElement>('today-button'), addDateButton: get<HTMLButtonElement>('add-date-button'),
     dateForm: get<HTMLFormElement>('date-form'), entryDate: get<HTMLInputElement>('entry-date'),
     cloudSection: get<HTMLElement>('cloud-section'), providerList: get<HTMLDivElement>('cloud-providers'),
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),

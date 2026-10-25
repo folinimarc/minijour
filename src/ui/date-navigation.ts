@@ -9,16 +9,14 @@ export function setupDateNavigation(
 ): void {
   let rendered = '';
   const refresh = () => {
-    const today = localDate();
-    const dates = [today, ...view.dates.filter(date => date !== today)];
+    const dates = view.dates;
     const key = dates.join(',');
     if (key !== rendered) {
       rendered = key;
       const rows = dates.map(date => {
         const row = document.createElement('li');
-        if (date === today) row.className = 'today-date';
         const link = document.createElement('button');
-        link.className = 'date-link'; link.textContent = date === today ? `Today (${date})` : date; link.value = date;
+        link.className = 'date-link'; link.textContent = date; link.value = date;
         link.onclick = () => { ui.dateSidebar.close(); view.openDate(date); };
         const remove = document.createElement('button');
         remove.className = 'icon-button delete-date'; remove.innerHTML = icon('trash');
@@ -47,9 +45,16 @@ export function setupDateNavigation(
     ui.dateSidebar.showModal();
     ui.datesButton.setAttribute('aria-expanded', 'true');
   };
+  const showDateForm = (show: boolean) => {
+    ui.dateForm.hidden = !show;
+    ui.addDateButton.setAttribute('aria-expanded', String(show));
+    if (show) ui.entryDate.focus();
+  };
+  ui.todayButton.onclick = () => { ui.dateSidebar.close(); view.openDate(localDate()); };
+  ui.addDateButton.onclick = () => showDateForm(!!ui.dateForm.hidden);
   ui.closeDates.onclick = () => ui.dateSidebar.close();
   ui.dateSidebar.addEventListener('close', () => {
-    ui.dateSidebar.querySelector<HTMLDetailsElement>('.add-date')!.open = false;
+    showDateForm(false);
     document.body.append(ui.notice);
     ui.datesButton.setAttribute('aria-expanded', 'false');
   });

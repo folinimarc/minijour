@@ -19,11 +19,12 @@ test('opens only today and collapses other entries when navigating through the d
   await expect(old.locator('.day-toggle')).toHaveAttribute('aria-expanded', 'false');
   await expect(old.locator('.cm-content')).toHaveCount(0);
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
-  await expect(page.locator('.date-link')).toHaveText([`Today (${TODAY})`, ...dates.slice(1)]);
-  await expect(page.locator('.date-link[aria-current]')).toHaveText(`Today (${TODAY})`);
+  await expect(page.locator('.date-link')).toHaveText(dates);
+  await expect(page.locator('.date-link[aria-current]')).toHaveText(TODAY);
   await page.screenshot({ path: 'test-results/dates-sidebar-mobile.png' });
   await page.locator('#date-sidebar nav').evaluate(nav => { nav.scrollTop = nav.scrollHeight; });
-  await expect(page.getByRole('button', { name: `Today (${TODAY})`, exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Go to today', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Add date', exact: true })).toBeInViewport();
   await page.getByRole('button', { name: '2026-10-01', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Dates', exact: true })).toBeHidden();
   await expect(old.locator('.day-toggle')).toHaveAttribute('aria-expanded', 'true');
@@ -64,10 +65,10 @@ test('removes an abandoned blank date without saving it and leaves today ready t
     await dialog.dismiss();
   });
   await page.getByRole('button', { name: 'Delete entry for 2030-01-02' }).click();
-  await expect(page.locator('.date-link')).toHaveText([`Today (${TODAY})`, '2030-01-02']);
+  await expect(page.locator('.date-link')).toHaveText(['2030-01-02', TODAY]);
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Delete entry for 2030-01-02' }).click();
-  await expect(page.locator('.date-link')).toHaveText([`Today (${TODAY})`]);
+  await expect(page.locator('.date-link')).toHaveText([TODAY]);
   expect(await storedDates(page)).toEqual([]);
   await page.getByRole('button', { name: 'Close dates' }).click();
   await expect(page.locator('[data-date="2030-01-02"]')).toBeHidden();
@@ -77,19 +78,21 @@ test('removes an abandoned blank date without saving it and leaves today ready t
   await page.screenshot({ path: 'test-results/journal-small-mobile.png' });
 });
 
-test('keeps Today pinned when another date is selected and the local date changes', async ({ page }) => {
+test('goes to the current local date without adding a special date row', async ({ page }) => {
   await openJournal(page);
   await openDate(page, '2020-02-29');
   await page.keyboard.insertText('An earlier memory.');
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
-  await expect(page.locator('.date-link').first()).toHaveText(`Today (${TODAY})`);
+  await expect(page.locator('.date-link').first()).toHaveText(TODAY);
   await page.clock.setSystemTime(new Date('2026-10-26T12:00:00Z'));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await expect(page.locator('.date-link').first()).toHaveText('Today (2026-10-26)');
+  await expect(page.locator('.date-link')).toHaveText([TODAY, '2020-02-29']);
   await expect(page.locator('.date-link[aria-current]')).toHaveText('2020-02-29');
-  await page.getByRole('button', { name: 'Today (2026-10-26)', exact: true }).click();
+  await page.getByRole('button', { name: 'Go to today', exact: true }).click();
   await expect(page.locator('[data-date="2026-10-26"] .cm-content')).toBeFocused();
   await expect(page.locator('.day-toggle[aria-expanded=true]')).toHaveCount(1);
   await expect(page.locator('[data-date="2020-02-29"] .day-content')).toBeHidden();
   expect(await storedDates(page)).toEqual(['2020-02-29']);
+  await page.getByRole('button', { name: 'Dates', exact: true }).click();
+  await expect(page.locator('.date-link')).toHaveText(['2026-10-26', TODAY, '2020-02-29']);
 });

@@ -12,7 +12,7 @@ Date headings are managed by the app. Each day has its own editor, so selection 
 
 Entries appear newest first. Only today starts expanded; select a date heading to collapse or expand it. Today's date heading is visible even before you write. Blank drafts are not saved, synced, or exported, and disappear when you reopen the app. Adding text or a photo saves the entry.
 
-Choose **Dates** beside **Settings** to browse all dates. **Today (YYYY-MM-DD)** stays at the top, above any future dates. Selecting a date expands its entry, collapses the others, and moves the cursor there. **Add a date** opens any past or future date; an existing date opens its current entry. Opening the app always returns to today. Daily rollover does not interrupt a past or future date you deliberately opened.
+Choose **Dates** beside **Settings** to browse all dates. **Go to today** and **Add date** sit below the title. All dates appear in newest-first order. Selecting a date expands its entry, collapses the others, and moves the cursor there. **Add date** shows a picker for any past or future date; an existing date opens its current entry. Opening the app always returns to today. Daily rollover does not interrupt a past or future date you deliberately opened.
 
 The bin beside a date deletes its current text after confirmation. Photos remain in storage until you clean them up separately. Today's empty writing surface remains available. Deleting or clearing an entry retains its Automerge history for sync, rather than erasing old checkpoints or backups. Concurrent edits can still merge into that date. Cleared dates opened in this session keep their heading and editor for undo; after reloading, only dates with content and today's draft appear.
 

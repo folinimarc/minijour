@@ -58,8 +58,6 @@ label { display: block; font-size: 12px; margin: 14px 0 7px; }
 input[type=text], input[type=password], input[readonly] { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 11px; font-size: 13px; background: var(--paper); color: var(--ink); }
 input[readonly] { font-size: 11px; }
 input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: var(--paper); color: var(--ink); font-size: 13px; min-width: 0; }
-.add-date summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-.add-date summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .button-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 #photo-cleanup-review { scroll-margin-block: 12px; }
 .primary-button, .secondary-button, .text-button { padding: 11px 15px; font-size: 12px; border-radius: 7px; border: 1px solid transparent; }
@@ -75,14 +73,13 @@ input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 1
 .date-sidebar nav { overflow-y: auto; min-height: 0; flex: 1; }
 .date-list { list-style: none; padding: 0; margin: 0; }
 .date-list li { display: flex; align-items: center; gap: 8px; }
-.date-list .today-date { position: sticky; top: 0; z-index: 1; background: var(--surface); }
 .date-link { flex: 1; padding: 12px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); text-align: left; font-size: 13px; }
 .date-link:hover, .date-link[aria-current] { color: var(--ink); background: var(--paper); }
 .delete-date { width: 32px; height: 36px; }
 .delete-date svg { width: 15px; height: 15px; }
-.add-date { padding-top: 20px; border-top: 1px solid var(--line); margin-top: 16px; flex-shrink: 0; }
-.add-date form { display: grid; gap: 8px; }
-.add-date label { margin-bottom: 0; }
+.date-actions { margin-bottom: 16px; flex-shrink: 0; }
+.add-date { display: grid; gap: 8px; margin: 0 0 16px; flex-shrink: 0; }
+.add-date label { margin: 0; }
 .add-date input { width: 100%; }
 @media (max-width: 600px) {
   :root { --header-height: 74px; }

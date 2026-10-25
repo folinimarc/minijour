@@ -56,7 +56,7 @@ test('allows a photo-only entry on an arbitrary date and keeps the date control 
 test('rejects a missing date without creating or saving a section', async ({ page }) => {
   await openJournal(page);
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
-  await page.getByText('Add a date', { exact: true }).click();
+  await page.getByRole('button', { name: 'Add date', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open date', exact: true })).toBeInViewport({ ratio: 0.99 });
   await page.screenshot({ path: 'test-results/date-settings-mobile.png' });
   await page.getByLabel('Entry date', { exact: true }).evaluate((input: HTMLInputElement) => {

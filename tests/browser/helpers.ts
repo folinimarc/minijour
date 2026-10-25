@@ -10,7 +10,7 @@ export async function openJournal(page: Page) {
 
 export async function openDate(page: Page, date: string) {
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
-  await page.getByText('Add a date', { exact: true }).click();
+  await page.getByRole('button', { name: 'Add date', exact: true }).click();
   await page.getByLabel('Entry date', { exact: true }).fill(date);
   await page.getByRole('button', { name: 'Open date', exact: true }).click();
   await expect(page.locator(`[data-date="${date}"] .cm-content`)).toBeFocused();
