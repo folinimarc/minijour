@@ -1,16 +1,18 @@
 import * as A from '@automerge/automerge';
-import { zipSync, unzipSync, strToU8 } from 'fflate';
+import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { isDate, loadDay, markdown } from '../domain/day';
 import type { Journal } from '../domain/journal';
 import { PHOTO_NAME, referencedPhotos, encodePhotoDeletions, decodePhotoDeletions } from '../domain/photos';
 
 const DAY_FILE = /^minijour\/\d{4}-\d{2}-\d{2}\.automerge$/;
 const DELETIONS_FILE = 'minijour/photo-deletions.json';
+const FORMAT_FILE = 'minijour/format.json';
 
 /** A portable ZIP holds current Markdown/photos, text history, and deletion metadata. */
 export async function exportJournal(journal: Journal): Promise<Blob> {
   const days = new Map(journal.days);
   const files: Record<string, Uint8Array> = {
+    [FORMAT_FILE]: strToU8(JSON.stringify({ version: 1 })),
     'journal.md': strToU8(markdown(days)),
     'README.txt': strToU8('journal.md and photos/ are readable in any Markdown editor.\nOnly photos referenced in the current Markdown are included.\nTo restore text editing history and permanent photo deletion records in minijour, import this entire ZIP.\nPast photo references in editing history may have no image.\nCloud credentials and encryption keys are never included.\n'),
   };
@@ -32,12 +34,15 @@ export async function importJournal(journal: Journal, file: File): Promise<void>
     filter(entry) {
       totalSize += entry.originalSize;
       if (totalSize > 500 * 1024 * 1024) throw new Error('The expanded backup is too large (500 MB maximum).');
-      return DAY_FILE.test(entry.name) || entry.name === DELETIONS_FILE
+      return DAY_FILE.test(entry.name) || entry.name === DELETIONS_FILE || entry.name === FORMAT_FILE
         || (entry.name.startsWith('photos/') && PHOTO_NAME.test(entry.name.slice(7)));
     },
   });
   const days = Object.entries(files).filter(([path]) => DAY_FILE.test(path));
-  if (!days.length) throw new Error('Choose a minijour backup ZIP containing its editing history.');
+  if (files[FORMAT_FILE]) {
+    const format = JSON.parse(strFromU8(files[FORMAT_FILE]));
+    if (format?.version !== 1) throw new Error('Unsupported minijour backup format.');
+  } else if (!days.length) throw new Error('Choose a minijour backup ZIP containing its editing history.');
   // Validate every day before importing anything. Restore merges, never replaces.
   for (const [path, bytes] of days) {
     if (!isDate(path.slice(9, 19))) throw new Error('The backup contains an invalid date.');

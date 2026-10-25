@@ -85,6 +85,16 @@ export function mountShell() {
         </div>
       </section>
       <section class="settings-section settings-small">
+        <details class="advanced-settings">
+          <summary>Write on another date</summary>
+          <form id="date-form">
+            <label for="entry-date">Entry date</label>
+            <div class="button-row"><input id="entry-date" type="date" required /><button class="secondary-button" type="submit">Open date</button></div>
+          </form>
+          <p class="help">Choose a past or future date. Entries stay in date order. A blank draft is saved only when you add text or a photo.</p>
+        </details>
+      </section>
+      <section class="settings-section settings-small">
         <h2>Install</h2>
         <p>Install from your browser’s menu, or choose <strong>Add to Home Screen</strong> from the Share menu. After the first visit and offline installation, you can write without a connection.</p>
         <button id="install-button" class="secondary-button" hidden>Install minijour</button>
@@ -111,6 +121,7 @@ export function mountShell() {
     restore: get<HTMLButtonElement>('restore-button'),
     storageStatus: get<HTMLParagraphElement>('storage-status'), storageHelp: get<HTMLParagraphElement>('storage-help'),
     requestStorage: get<HTMLButtonElement>('request-storage'),
+    dateForm: get<HTMLFormElement>('date-form'), entryDate: get<HTMLInputElement>('entry-date'),
     cloudSection: get<HTMLElement>('cloud-section'), providerList: get<HTMLDivElement>('cloud-providers'),
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),
     photoCleanupSummary: get<HTMLParagraphElement>('photo-cleanup-summary'),

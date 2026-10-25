@@ -6,12 +6,14 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Added
 
+- A collapsed date picker in settings for writing on any past or future date, with entries kept in chronological order.
 - Device storage protection status, one-time advice when protection is unavailable, and an explicit request button in settings.
 
 ### Changed
 
 - Keep the journal header visible while scrolling and open at the end of today's entry.
-- Hide blank dates other than today and omit empty dates from Markdown exports, while preserving editing history in storage, sync, and backups.
+- Ignore unwritten dates: drafts have no date heading and are not saved, synced, or exported until text or a photo is added. Cleared entries retain internal history for safe merging, without appearing as empty journal entries.
+- Support exporting and restoring journals with no saved entries, while retaining compatibility with older backups.
 
 ## 0.1.0 - 2026-10-25
 

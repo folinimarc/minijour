@@ -4,13 +4,17 @@
 
 ## Write
 
-Choose **Open journal** from the information page, or open `/journal/` directly. Installed apps launch straight into the journal. Today's local date is prepared, with the cursor and view at the end of its entry. The top bar stays visible while you scroll. Type Markdown; changes save automatically. Dates follow your device's timezone. A new section appears at midnight or when you return after the date changes.
+Choose **Open journal** from the information page, or open `/journal/` directly. Installed apps launch straight into the journal. Today's writing surface is ready, with the cursor and view at the end of its entry. The top bar stays visible while you scroll. Type Markdown; changes save automatically. Dates follow your device's timezone. Daily writing advances to the new date at midnight or when you return after the date changes.
 
 Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have inline previews; their Markdown links remain editable.
 
 Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **…** for cloud sync, backups, and installation information.
 
-Today's section stays visible even when empty. Other dates containing only whitespace are hidden; a section you are clearing stays visible until you leave its editor, so you can still undo. A photo's Markdown link counts as content. Empty dates are omitted from exported Markdown, while the backup retains their editing history for restore and merging.
+Empty days have no visible date heading and are omitted from exported Markdown. Before you write, there is just a draft with a placeholder showing its date. Opening a date and leaving it blank, or typing only whitespace, does not save or sync an entry. Adding text or a photo creates the dated entry.
+
+For another date, open **… → Write on another date**, choose any past or future date, and select **Open date**. Entries stay in chronological order. An existing date opens its current entry. Abandoned blank drafts disappear when you reopen the app. Opening the app always returns to today; daily rollover does not interrupt a past or future date you deliberately opened.
+
+Clearing an existing entry removes its heading and leaves a draft while you are editing, so you can still undo. Other empty entries are hidden. The app retains the cleared entry's internal history for restore and merging, which prevents an offline device from bringing the deleted text back.
 
 ## Install
 
@@ -74,7 +78,7 @@ Choose **Download backup** to save a ZIP containing:
 
 - `journal.md`: dates with content and their text as ordinary Markdown.
 - `photos/`: JPEG attachments referenced by the Markdown.
-- `minijour/`: Automerge text history for restore and future merging, plus permanent photo deletion records when present.
+- `minijour/`: backup format metadata, Automerge text history for restore and future merging, plus permanent photo deletion records when present. Unsaved drafts are excluded.
 
 Only photos referenced in the current Markdown are included; exporting does not clean up storage. Images referenced only by older editing history are omitted.
 

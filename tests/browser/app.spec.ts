@@ -221,7 +221,7 @@ test('shows local journaling without provider choices or setup controls when non
   await page.getByRole('button', { name: 'Settings and backup' }).click();
   await expect(page.getByRole('heading', { name: 'Cloud sync', exact: true })).toBeHidden();
   await expect(page.locator('#cloud-providers button')).toHaveCount(0);
-  await expect(page.locator('#app-key, #redirect-uri, details')).toHaveCount(0);
+  await expect(page.locator('#app-key, #redirect-uri, #cloud-section details')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Download backup' })).toBeEnabled();
   expect(cloudRequests).toEqual([]);
 });

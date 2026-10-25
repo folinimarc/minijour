@@ -75,7 +75,9 @@ Both pages register the same service worker, which precaches both shells. Naviga
 
 The interface is one continuous chronological page. Internally, **each day is its own Automerge document containing `{ text: string }`**, displayed in a separate editor. Export combines the sections into one `journal.md` with `# YYYY-MM-DD` headings. Day boundaries are managed by the app; a selection or undo history stays within its day's editor.
 
-`hasContent()` treats whitespace-only text as empty. The journal hides empty dates other than today, except while their editor has focus so clearing text does not interrupt undo. It never deletes their documents. Markdown export skips empty dates; ZIP editing-history files and cloud sync retain them. Visibility updates on edits, incoming merges, and date changes.
+`hasContent()` treats whitespace-only text as empty. `main.ts` holds unsaved drafts in a separate map, outside `Journal.days`. Opening a date creates only a draft editor; the first edit with content merges its Automerge document into the journal and saves it. Whitespace-only drafts never reach IndexedDB, backups, or sync. The selected blank draft has a date-specific placeholder and no heading; other empty dates are hidden. The collapsed date form in settings opens existing or new dates in chronological order, with no minimum or maximum date.
+
+Once an entry has been saved, clearing it still persists and syncs its Automerge history. Deleting that history would let older offline replicas resurrect its text. Its date heading disappears, but the selected editor remains available for undo. Markdown export skips empty dates; ZIP editing-history files and cloud sync retain saved deletion history. Daily rollover advances today's draft, while preserving an explicitly selected past or future date.
 
 The top bar is sticky. On opening, the editor explicitly scrolls its final position into view; delayed photo loads and viewport resizing can repeat that reveal until the first user interaction. Browser scroll restoration is disabled on the journal page. After interaction, incoming sync preserves the person's position.
 
@@ -160,7 +162,9 @@ A downloaded backup ZIP contains:
 
 - `journal.md`: your entire journal as ordinary Markdown.
 - `photos/`: portable JPEG attachments referenced by the current Markdown.
-- `minijour/`: Automerge documents for restoring text history and future merging; optional `photo-deletions.json` retains permanent photo deletion records.
+- `minijour/`: `format.json` with `{ version: 1 }`, Automerge documents for restoring text history and future merging, and optional `photo-deletions.json` for permanent photo deletion records.
+
+The format marker makes a new journal with no saved dates a valid empty backup. It creates no day on restore and does not clear existing entries. Older backups without a marker remain supported when they contain editing-history files. Unsupported format versions are rejected before importing anything. Unsaved UI drafts are never exported.
 
 Export snapshots the current text, so unused photos and images mentioned only in earlier history are omitted. Export itself never deletes anything. Restore validates all metadata before importing, applies deletion records first, then photos and text. Old ZIPs without deletion metadata still work. A known deletion blocks an old photo from being saved, even when restoring a previous backup.
 

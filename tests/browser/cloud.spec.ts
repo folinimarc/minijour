@@ -2,9 +2,28 @@ import * as A from '@automerge/automerge';
 import { createDay, editDay } from '../../src/domain/day';
 import { expect, test } from '@playwright/test';
 import { DropboxMock } from './dropbox-mock';
-import { openJournal, addTestPhoto, replaceEntry, storedPhotos, connect, unlock, sync, PASSWORD } from './helpers';
+import { openDate, openJournal, addTestPhoto, replaceEntry, storedDates, storedPhotos, connect, unlock, sync, PASSWORD } from './helpers';
 
 test.skip(!process.env.VITE_DROPBOX_APP_KEY, 'This build has no configured Dropbox provider.');
+
+test('does not sync blank drafts, and a cleared future entry stays cleared on another device', async ({ page, context, browser }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page); await connect(page);
+  await openDate(page, '2030-01-02'); await sync(page);
+  expect(await storedDates(page)).toEqual([]);
+  expect([...mock.files.keys()].filter(path => path.includes('/objects/'))).toEqual([]);
+  await page.keyboard.insertText('A future memory.'); await sync(page);
+  const fresh = await browser.newContext({ serviceWorkers: 'block' }); await mock.install(fresh);
+  const other = await fresh.newPage(); await openJournal(other); await connect(other);
+  await expect(other.locator('[data-date="2030-01-02"] .cm-content')).toContainText('A future memory.');
+  await page.locator('[data-date="2030-01-02"] .cm-content').click();
+  await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
+  await sync(page); await sync(other);
+  await expect(other.locator('[data-date="2030-01-02"]')).toBeHidden();
+  await expect(other.locator('.day-heading:visible')).toHaveCount(0);
+  expect(await storedDates(other)).toEqual(['2030-01-02']); // Deletion history prevents stale resurrection.
+  await fresh.close();
+});
 
 test('connects Dropbox and merges offline changes across two browser devices', async ({ browser }) => {
   const mock = new DropboxMock();
@@ -47,7 +66,7 @@ test('offers only configured cloud providers and uses deployment credentials wit
   await page.getByRole('button', { name: 'Settings and backup' }).click();
   await expect(page.getByLabel('Dropbox app key', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('OAuth redirect URI')).toHaveCount(0);
-  await expect(page.locator('details, #app-key, #redirect-uri')).toHaveCount(0);
+  await expect(page.locator('#cloud-section details, #app-key, #redirect-uri')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Cloud sync', exact: true })).toBeVisible();
   await expect(page.locator('#cloud-providers button')).toHaveCount(1);
   const authorization = page.waitForRequest(request => request.url().startsWith('https://www.dropbox.com/oauth2/authorize?'));

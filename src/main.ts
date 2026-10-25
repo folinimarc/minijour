@@ -2,7 +2,7 @@
 import * as A from '@automerge/automerge';
 import automergeWasm from '@automerge/automerge/automerge.wasm?url';
 import { registerSW } from 'virtual:pwa-register';
-import { hasContent, localDate } from './domain/day';
+import { createDay, hasContent, isDate, localDate, type DayDoc } from './domain/day';
 import { Journal } from './domain/journal';
 import { LocalStore } from './storage/local';
 import { exportJournal, importJournal } from './storage/backup';
@@ -32,7 +32,10 @@ async function start(): Promise<void> {
   const journal = new Journal(local);
   const urls = new PhotoUrls(local);
   const editors = new Map<string, DayEditor>();
+  // Blank writing surfaces live only in this tab, outside the saved journal.
+  const drafts = new Map<string, DayDoc>();
   let activeDate = localDate();
+  let today = activeDate;
   let syncing = false;
   let cleaning = false;
   let cloudWorking = false;
@@ -104,13 +107,15 @@ async function start(): Promise<void> {
     const editor = editors.get(date);
     if (!editor) return;
     const section = editor.view.dom.closest<HTMLElement>('.day')!;
-    // Keep a just-cleared editor available for undo until focus leaves it.
-    section.hidden = date !== localDate() && !hasContent(journal.days.get(date)!) && !editor.view.hasFocus;
-    if (section.hidden && activeDate === date) activeDate = localDate();
+    const filled = hasContent(journal.days.get(date) ?? drafts.get(date)!);
+    section.hidden = !filled && date !== activeDate && !editor.view.hasFocus;
+    section.querySelector<HTMLElement>('.day-heading')!.hidden = !filled;
+    section.classList.toggle('draft', !filled);
   }
 
   function renderDay(date: string): void {
-    const doc = journal.days.get(date)!;
+    const doc = journal.days.get(date) ?? drafts.get(date)!;
+    if (journal.days.has(date)) drafts.delete(date);
     const existing = editors.get(date);
     if (existing) {
       existing.receive(doc);
@@ -138,8 +143,16 @@ async function start(): Promise<void> {
     ui.journal.insertBefore(section, following ?? null);
     const editor = new DayEditor(content, doc, date, urls, next => {
       openingEditor = undefined;
+      if (!journal.days.has(date) && !hasContent(next)) {
+        drafts.set(date, next);
+        updateDayVisibility(date);
+        return;
+      }
       void journal.merge(date, A.save(next)).then(storage.afterEdit).catch(notify);
-    }, () => { activeDate = date; }, () => updateDayVisibility(date));
+    }, () => {
+      activeDate = date;
+      for (const day of editors.keys()) updateDayVisibility(day);
+    }, () => updateDayVisibility(date));
     editors.set(date, editor);
     updateDayVisibility(date);
   }
@@ -158,26 +171,31 @@ async function start(): Promise<void> {
 
   for (const date of [...journal.days.keys()].sort()) renderDay(date);
 
+  function openDate(date: string, followOpening = false): void {
+    if (!isDate(date)) throw new Error('Choose a valid calendar date.');
+    if (!journal.days.has(date) && !drafts.has(date)) drafts.set(date, createDay(date));
+    activeDate = date;
+    renderDay(date);
+    for (const day of editors.keys()) updateDayVisibility(day);
+    if (!ui.dialog.open) {
+      openingEditor = followOpening ? editors.get(date) : undefined;
+      editors.get(date)?.focusEnd();
+    }
+  }
+
   async function openToday(focus = true): Promise<void> {
     const date = localDate();
-    const isNew = !journal.days.has(date);
-    await journal.ensureDay(date);
-    for (const day of editors.keys()) updateDayVisibility(day);
-    if (isNew || focus) {
-      activeDate = date;
-      if (!ui.dialog.open) {
-        openingEditor = editors.get(date);
-        openingEditor?.focusEnd();
-      }
-    }
+    // Midnight advances ordinary daily writing, without interrupting a date
+    // deliberately opened in the past or future.
+    if (focus || (date !== today && activeDate === today)) openDate(date, true);
+    today = date;
     clearTimeout(nextDay);
     const midnight = new Date();
     midnight.setHours(24, 0, 0, 0);
     nextDay = setTimeout(() => { void openToday(false).catch(notify); }, midnight.getTime() - Date.now() + 100);
   }
 
-  // A quota error must not disable settings: the user can still export the
-  // in-memory journal before closing the app.
+  // Opening a writing surface does not save a new, empty day.
   try { await openToday(); } catch (error) { notify(error); }
   ui.journal.setAttribute('aria-busy', 'false');
   updateStatus();
@@ -192,7 +210,20 @@ async function start(): Promise<void> {
   window.visualViewport?.addEventListener('resize', revealOpening);
 
   ui.settingsButton.onclick = () => {
-    closePhotoMenu(); ui.dialog.append(ui.notice); ui.dialog.showModal(); void storage.refresh();
+    closePhotoMenu(); ui.entryDate.value = activeDate;
+    ui.dialog.append(ui.notice); ui.dialog.showModal(); void storage.refresh();
+  };
+  const dateSettings = ui.dateForm.closest<HTMLDetailsElement>('details')!;
+  dateSettings.ontoggle = () => { if (dateSettings.open) dateSettings.scrollIntoView({ block: 'nearest' }); };
+  ui.dateForm.onsubmit = event => {
+    event.preventDefault();
+    try {
+      const date = ui.entryDate.value;
+      if (!isDate(date)) throw new Error('Choose a valid calendar date.');
+      dateSettings.open = false;
+      ui.dialog.close();
+      openDate(date);
+    } catch (error) { notify(error); }
   };
   ui.closeSettings.onclick = () => ui.dialog.close();
   ui.dialog.addEventListener('click', event => { if (event.target === ui.dialog && event.clientX) {

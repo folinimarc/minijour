@@ -7,7 +7,7 @@ import { exportJournal, importJournal } from '../src/storage/backup';
 import { SyncEngine } from '../src/sync/engine';
 import { DropboxFiles } from '../src/sync/dropbox';
 import { MemoryCloud } from './helpers';
-import { strFromU8, unzipSync } from 'fflate';
+import { strFromU8, unzipSync, zipSync } from 'fflate';
 
 const DATE = '2026-10-24';
 function saveConnection(journal: Journal, value: { appKey: string; accountId: string }, options = {}) {
@@ -216,4 +216,29 @@ it('omits blank dates from Markdown while keeping their editing history restorab
   await importJournal(restored, new File([exported], 'blank-history.zip'));
   expect(heads(restored.days.get(DATE)!)).toEqual(heads(journal.days.get(DATE)!));
   expect(restored.days.get(DATE)!.text).toBe(' \n\t');
+});
+
+it('exports and restores a journal with no saved dates without creating an empty day', async () => {
+  const local = await LocalStore.open(crypto.randomUUID()); stores.push(local);
+  const empty = new Journal(local, crypto.randomUUID()); journals.push(empty);
+  const backup = await exportJournal(empty);
+  const files = unzipSync(new Uint8Array(await backup.arrayBuffer()));
+  expect(Object.keys(files).filter(path => path.endsWith('.automerge'))).toEqual([]);
+  expect(strFromU8(files['journal.md'])).toBe('');
+  expect(JSON.parse(strFromU8(files['minijour/format.json']))).toEqual({ version: 1 });
+  await importJournal(empty, new File([backup], 'empty.zip'));
+  expect(empty.days.size).toBe(0);
+  expect((await local.days()).size).toBe(0);
+  const written = await device(); await written.edit(DATE, 'Keep my entry.');
+  await importJournal(written, new File([backup], 'empty.zip'));
+  expect(written.days.get(DATE)!.text).toBe('Keep my entry.');
+});
+
+it('rejects unsupported backup metadata before importing entries', async () => {
+  const source = await device(); await source.edit(DATE, 'Do not import this.');
+  const files = unzipSync(new Uint8Array(await (await exportJournal(source)).arrayBuffer()));
+  files['minijour/format.json'] = new TextEncoder().encode('{"version":99}');
+  const target = await device();
+  await expect(importJournal(target, new File([new Uint8Array(zipSync(files))], 'future.zip'))).rejects.toThrow('Unsupported minijour backup');
+  expect(target.days.get(DATE)!.text).toBe('');
 });

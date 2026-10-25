@@ -87,6 +87,7 @@ it('accepts legacy backups but never restores a photo permanently deleted on thi
   await journal.edit(DATE, `![photo](photos/${name})`);
   const entries = unzipSync(new Uint8Array(await (await backup(journal)).arrayBuffer()));
   delete entries['minijour/photo-deletions.json']; // Backups from older versions.
+  delete entries['minijour/format.json'];
   const legacy = new File([new Uint8Array(zipSync(entries))], 'old.zip');
   await journal.edit(DATE, 'Removed photo.');
   await journal.deletePhotos([name]);

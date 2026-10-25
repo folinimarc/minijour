@@ -71,7 +71,7 @@ export class DayEditor {
           markdown(), history(), keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.lineWrapping,
           EditorView.scrollMargins.of(() => ({ top: document.querySelector('.topbar')!.getBoundingClientRect().height, bottom: 24 })),
-          placeholder('Start writing…'),
+          placeholder(`Write for ${date}…`),
           EditorView.contentAttributes.of({ 'aria-label': `Journal for ${date}`, spellcheck: 'true', autocapitalize: 'sentences', autocorrect: 'on' }),
           syntaxHighlighting(HighlightStyle.define([
             { tag: tags.heading, fontWeight: '600', color: '#354438' },

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import * as A from '@automerge/automerge';
 import { zipSync } from 'fflate';
 import { createDay, editDay } from '../../src/domain/day';
-import { addTestPhoto, openJournal, replaceEntry } from './helpers';
+import { addTestPhoto, openDate, openJournal, replaceEntry, storedDates } from './helpers';
 
 const TODAY = '2026-10-25';
 
@@ -70,7 +70,7 @@ test('hides older blank dates, preserves focused undo, and reveals entries recei
   await page.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
   await openJournal(page);
   await restoreDays(page, { '2026-10-23': ' \n\t', '2026-10-24': 'An older memory.' });
-  await expect(page.locator('.day:visible .day-heading time')).toHaveText(['2026-10-24', TODAY]);
+  await expect(page.locator('.day-heading:visible time')).toHaveText(['2026-10-24']);
   const older = page.locator('[data-date="2026-10-24"] .cm-content');
   await older.click(); await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
   await expect(older).toBeFocused();
@@ -78,16 +78,16 @@ test('hides older blank dates, preserves focused undo, and reveals entries recei
   await page.keyboard.press('ControlOrMeta+Z');
   await expect(older).toContainText('An older memory.');
   await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
-  await page.locator(`[data-date="${TODAY}"] .cm-content`).click();
+  await openDate(page, TODAY);
   await expect(older).toBeHidden();
-  await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);
+  await expect(page.locator('.day-heading:visible')).toHaveCount(0);
   await expect(page.locator('.day:visible').first()).toHaveCSS('border-top-width', '0px');
   const other = await context.newPage();
   await other.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
   await openJournal(other);
   await restoreDays(other, { '2026-10-23': 'An entry from another tab.' });
   await expect(page.locator('[data-date="2026-10-23"] .cm-content')).toBeVisible();
-  await expect(page.locator('.day:visible .day-heading time')).toHaveText(['2026-10-23', TODAY]);
+  await expect(page.locator('.day-heading:visible time')).toHaveText(['2026-10-23']);
 });
 
 test('keeps the opening cursor visible when a photo finishes loading later', async ({ page }) => {
@@ -115,13 +115,15 @@ test('keeps the opening cursor visible when a photo finishes loading later', asy
   await expect(lastLine).toBeInViewport({ ratio: 0.99 });
 });
 
-test('keeps only today visible when a blank day rolls over', async ({ page }) => {
+test('advances the writing draft at midnight without saving empty dates', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-24T21:59:59Z') });
   await openJournal(page);
   await replaceEntry(page, ' \n\t');
   await page.clock.runFor(2100);
   await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);
   await expect(page.locator(`[data-date="${TODAY}"] .cm-content`)).toBeFocused();
+  await expect(page.locator('.day-heading:visible')).toHaveCount(0);
+  expect(await storedDates(page)).toEqual([]);
   await page.reload();
   await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);
 });

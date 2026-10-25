@@ -5,6 +5,27 @@ export async function openJournal(page: Page) {
   await expect(page.locator('.cm-content').last()).toBeVisible();
 }
 
+export async function openDate(page: Page, date: string) {
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByText('Write on another date', { exact: true }).click();
+  await page.getByLabel('Entry date', { exact: true }).fill(date);
+  await page.getByRole('button', { name: 'Open date', exact: true }).click();
+  await expect(page.locator(`[data-date="${date}"] .cm-content`)).toBeFocused();
+}
+
+export async function storedDates(page: Page): Promise<string[]> {
+  return page.evaluate(() => new Promise<string[]>((resolve, reject) => {
+    const open = indexedDB.open('minijour-v1');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const request = db.transaction('days').objectStore('days').getAllKeys();
+      request.onsuccess = () => { db.close(); resolve(request.result as string[]); };
+      request.onerror = () => reject(request.error);
+    };
+  }));
+}
+
 export async function addTestPhoto(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Add a photo', exact: true }).click();
   await page.locator('#photo-input').setInputFiles('public/icon-192.png');
