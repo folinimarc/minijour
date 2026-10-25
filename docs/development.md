@@ -53,6 +53,8 @@ src/
     photo-cleanup.ts  Review, confirmation, and required cloud sync
     cloud-settings.ts Connection, password unlock, and legacy import controls
     shell.ts          Static application markup and element references
+    journal-view.ts   Date sections, local drafts, collapse state, lazy editors
+    date-navigation.ts Date drawer, date picker, and confirmed entry deletion
     editor.ts         CodeMirror editor and photo previews
     photos.ts         Image resizing and local display URLs
   style.css           Journal/editor visual styles
@@ -74,17 +76,21 @@ Both pages register the same service worker, which precaches both shells. Naviga
 
 ### Journal logo
 
-The book mark in `ui/icons.ts` was introduced as inline SVG in the [initial implementation](https://github.com/folinimarc/minijour/commit/ebb94a1e35e615696412f5a017ba0d325c86f24e), originally in `ui/shell.ts`. It was created during the assistant-assisted implementation; no third-party source or icon package was recorded. The wordmark uses the device's system font. Both pages share the SVG helper and wordmark styles in `base.css`.
+The book mark in `ui/logo.svg`, shared by `ui/icons.ts` and both favicons, was introduced as inline SVG in the [initial implementation](https://github.com/folinimarc/minijour/commit/ebb94a1e35e615696412f5a017ba0d325c86f24e), originally in `ui/shell.ts`. It was created during the assistant-assisted implementation; no third-party source or icon package was recorded. The wordmark uses the device's system font. Both pages share the SVG helper and wordmark styles in `base.css`.
 
 A provenance check on 2026-10-25 searched distinctive SVG path fragments and compared the official [Feather book](https://github.com/feathericons/feather/blob/main/icons/book.svg), [Lucide book](https://github.com/lucide-icons/lucide/blob/main/icons/book.svg) and [notebook](https://github.com/lucide-icons/lucide/blob/main/icons/notebook.svg), and [Tabler book-2](https://github.com/tabler/tabler-icons/blob/main/icons/outline/book-2.svg). None matched this path. This supports treating it as project artwork under the repository's [GPL-3.0-only license](../LICENSE); it does not establish uniqueness or trademark clearance. No separate third-party logo attribution was identified.
 
 ### The data model
 
-The interface is one continuous chronological page. Internally, **each day is its own Automerge document containing `{ text: string }`**, displayed in a separate editor. Export combines the sections into one `journal.md` with `# YYYY-MM-DD` headings. Day boundaries are managed by the app; a selection or undo history stays within its day's editor.
+The interface is one continuous page with the newest date first. Internally, **each day is its own Automerge document containing `{ text: string }`**, displayed in a separate editor. Export combines the sections into one `journal.md` with `# YYYY-MM-DD` headings. Day boundaries are managed by the app; a selection or undo history stays within its day's editor.
 
-`hasContent()` treats whitespace-only text as empty. `main.ts` holds unsaved drafts in a separate map, outside `Journal.days`. Opening a date creates only a draft editor; the first edit with content merges its Automerge document into the journal and saves it. Whitespace-only drafts never reach IndexedDB, backups, or sync. The selected blank draft has a date-specific placeholder and no heading; other empty dates are hidden. The collapsed date form in settings opens existing or new dates in chronological order, with no minimum or maximum date.
+`hasContent()` treats whitespace-only text as empty. `ui/journal-view.ts` owns local drafts outside `Journal.days`. Opening a date shows its heading immediately; the first edit with content merges its Automerge document into the journal and saves it. Whitespace-only drafts never reach IndexedDB, backups, or sync. Dates explicitly opened in this tab retain their headings until reload, even when cleared. Remote empty dates stay hidden unless opened locally. Midnight removes an abandoned blank daily draft without interrupting another selected date.
 
-Once an entry has been saved, clearing it still persists and syncs its Automerge history. Deleting that history would let older offline replicas resurrect its text. Its date heading disappears, but the selected editor remains available for undo. Markdown export skips empty dates; ZIP editing-history files and cloud sync retain saved deletion history. Daily rollover advances today's draft, while preserving an explicitly selected past or future date.
+The view sorts headings newest first and creates editors only for expanded sections. The latest three dates start expanded; selecting a date or focusing its editor keeps it expanded during incoming changes. Collapse choices last for the current tab session. Existing editors stay mounted when collapsed to preserve undo and composition; older dates never opened need only a heading. Text changes update only the affected editor unless the set of visible dates changes. The date drawer uses a native modal dialog for keyboard focus, Escape, and a small-screen overlay. Navigation expands and focuses an entry; adding an existing date does not duplicate it.
+
+Deleting a date asks for confirmation, then clears its text through `Journal.edit()`. This keeps the Automerge deletion history locally and in cloud checkpoints so unchanged old replicas do not resurrect text. Concurrent new edits can still merge. No day documents or photo blobs are physically removed, and there is no format migration. Deleted dates disappear from the view unless new content arrives; today's blank draft is recreated. Unsaved blank drafts are simply discarded. Markdown export skips empty dates and keeps its existing oldest-first order; ZIP history and cloud sync retain saved clearing history.
+
+Sync still fetches and merges all days and photos. Deferring document sync until navigation would require reliable remote indexing and changes to backup and photo-reference checks. Lazy editor creation reduces browser work without changing the storage contract.
 
 The top bar is sticky. On opening, the editor explicitly scrolls its final position into view; delayed photo loads and viewport resizing can repeat that reveal until the first user interaction. Browser scroll restoration is disabled on the journal page. After interaction, incoming sync preserves the person's position.
 
@@ -181,7 +187,7 @@ An exported `journal.md` can be read in Obsidian. **Editing that exported file d
 
 ## Checks
 
-GitHub Actions runs unit tests and production browser tests on pull requests and pushes to `main`. Its two configurations cover a local-only build at the root and a cloud-enabled build at `/minijour/`. The latter runs the Dropbox integration tests; the former checks that no cloud controls or requests appear, including with credentials saved by an older build. You can reproduce the latter with:
+GitHub Actions runs unit tests and production browser tests on pull requests and pushes to `main`. Its two configurations cover a local-only build at the root and a cloud-enabled build at `/minijour/`. The latter runs the Dropbox integration tests; the former checks that no cloud connection buttons or requests appear, including with credentials saved by an older build. You can reproduce the latter with:
 
 ```sh
 MINIJOUR_TEST_SUBDIRECTORY=1 VITE_DROPBOX_APP_KEY=testpublickey npm run test:browser

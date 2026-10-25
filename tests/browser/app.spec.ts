@@ -49,18 +49,18 @@ test('loads and writes offline after the app shell has installed', async ({ page
   await expect(page.locator('.cm-content')).toContainText('Written without a connection.');
 });
 
-test('appends the new local day once after midnight', async ({ page }) => {
+test('prepends the new local day once after midnight', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-24T21:59:59Z') });
   await openJournal(page);
   await page.keyboard.insertText('Saturday memory.');
   await page.clock.runFor(2100);
-  await expect(page.locator('.day-heading time')).toHaveText(['2026-10-24', '2026-10-25']);
-  await expect(page.locator('.cm-content').last()).toBeFocused();
+  await expect(page.locator('.day-heading time')).toHaveText(['2026-10-25', '2026-10-24']);
+  await expect(page.locator('.cm-content').first()).toBeFocused();
   await page.keyboard.insertText('Sunday memory.');
   await page.reload();
   await expect(page.locator('.day')).toHaveCount(2);
-  await expect(page.locator('.cm-content').first()).toContainText('Saturday memory.');
-  await expect(page.locator('.cm-content').last()).toContainText('Sunday memory.');
+  await expect(page.locator('[data-date="2026-10-24"] .cm-content')).toContainText('Saturday memory.');
+  await expect(page.locator('[data-date="2026-10-25"] .cm-content')).toContainText('Sunday memory.');
 });
 
 test('shares local edits between tabs without replacing another tab’s typing', async ({ page, context }) => {

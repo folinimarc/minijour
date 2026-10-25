@@ -105,8 +105,8 @@ test('opens the unchanged database from the former root-page application', async
     };
   }), history);
   await page.getByRole('link', { name: 'Open journal' }).click();
-  await expect(page.locator('.cm-content').first()).toHaveText('Saved before the journal moved.');
+  await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toHaveText('Saved before the journal moved.');
   await page.reload();
-  await expect(page.locator('.day-heading time').first()).toHaveText('2020-01-01');
-  await expect(page.locator('.cm-content').first()).toHaveText('Saved before the journal moved.');
+  await expect(page.locator('[data-date="2020-01-01"] .day-heading time')).toHaveText('2020-01-01');
+  await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toHaveText('Saved before the journal moved.');
 });

@@ -20,7 +20,7 @@ test('does not sync blank drafts, and a cleared future entry stays cleared on an
   await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
   await sync(page); await sync(other);
   await expect(other.locator('[data-date="2030-01-02"]')).toBeHidden();
-  await expect(other.locator('.day-heading:visible')).toHaveCount(0);
+  await expect(other.locator('.day-heading:visible')).toHaveCount(1);
   expect(await storedDates(other)).toEqual(['2030-01-02']); // Deletion history prevents stale resurrection.
   await fresh.close();
 });
@@ -166,7 +166,7 @@ test('imports older plaintext Dropbox entries and photos explicitly without modi
   await page.getByRole('button', { name: 'Import older cloud files' }).click();
   await expect(page.getByRole('alert')).toContainText('Older files imported');
   await page.getByRole('button', { name: 'Close settings' }).click();
-  await expect(page.locator('.cm-content').first()).toContainText('Older private memory.');
+  await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toContainText('Older private memory.');
   expect(mock.files.get(path)!.bytes).toEqual(original);
   expect([...mock.files.keys()].filter(name => name.startsWith('/minijour-v1/'))).toHaveLength(2);
   expect([...mock.files.keys()].some(name => name.startsWith('/minijour-encrypted-v1/objects/'))).toBe(true);
@@ -335,4 +335,30 @@ test('honors cancellation while the confirmation sync is still in flight', async
   await expect(page.getByRole('button', { name: 'Clean up unused photos' })).toBeEnabled();
   await expect(page.locator('#photo-cleanup-review')).toBeHidden();
   expect(await storedPhotos(page)).toEqual([name]);
+});
+
+test('deletes an entry from the date drawer across devices while retaining photos and merge history', async ({ page, context, browser }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page); await connect(page);
+  await openDate(page, '2020-02-29');
+  const name = await addTestPhoto(page);
+  await page.keyboard.insertText('A memory to delete.'); await sync(page);
+  const fresh = await browser.newContext({ serviceWorkers: 'block' }); await mock.install(fresh);
+  const other = await fresh.newPage(); await openJournal(other); await connect(other);
+  await expect(other.locator('[data-date="2020-02-29"] .cm-content')).toContainText('A memory to delete.');
+  await page.getByRole('button', { name: 'Browse dates' }).click();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete entry for 2020-02-29' }).click();
+  await expect(page.getByRole('button', { name: '2020-02-29', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close dates' }).click();
+  await sync(page); await sync(other);
+  await expect(other.locator('[data-date="2020-02-29"]')).toBeHidden();
+  expect(await storedDates(other)).toContain('2020-02-29');
+  expect(await storedPhotos(page)).toContain(name);
+  expect(await storedPhotos(other)).toContain(name);
+  await other.reload();
+  await expect(other.locator('[data-date="2020-02-29"]')).toHaveCount(0);
+  await sync(other); await sync(page);
+  await expect(page.locator('[data-date="2020-02-29"]')).toBeHidden();
+  await fresh.close();
 });

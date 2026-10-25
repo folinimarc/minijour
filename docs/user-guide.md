@@ -10,11 +10,11 @@ Choose **Add photo**, then **Take a photo** or **Choose from device**. The image
 
 Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **…** for cloud sync, backups, and installation information.
 
-Empty days have no visible date heading and are omitted from exported Markdown. Before you write, there is just a draft with a placeholder showing its date. Opening a date and leaving it blank, or typing only whitespace, does not save or sync an entry. Adding text or a photo creates the dated entry.
+Entries appear newest first. The three most recent dates start expanded; select a date heading to collapse or expand it. Today's date heading is visible even before you write. Blank drafts are not saved, synced, or exported, and disappear when you reopen the app. Adding text or a photo saves the entry.
 
-For another date, open **… → Write on another date**, choose any past or future date, and select **Open date**. Entries stay in chronological order. An existing date opens its current entry. Abandoned blank drafts disappear when you reopen the app. Opening the app always returns to today; daily rollover does not interrupt a past or future date you deliberately opened.
+Choose the calendar button beside the logo to browse all dates. Selecting a date expands its entry and moves the cursor there. **Add a date** opens any past or future date; an existing date opens its current entry. Opening the app always returns to today. Daily rollover does not interrupt a past or future date you deliberately opened.
 
-Clearing an existing entry removes its heading and leaves a draft while you are editing, so you can still undo. Other empty entries are hidden. The app retains the cleared entry's internal history for restore and merging, which prevents an offline device from bringing the deleted text back.
+The bin beside a date deletes its current text after confirmation. Photos remain in storage until you clean them up separately. Today's empty writing surface remains available. Deleting or clearing an entry retains its Automerge history for sync, rather than erasing old checkpoints or backups. Concurrent edits can still merge into that date. Cleared dates opened in this session keep their heading and editor for undo; after reloading, only dates with content and today's draft appear.
 
 ## Install
 
@@ -32,7 +32,7 @@ The app focuses the editor on opening. Browsers control whether that raises the 
 
 Settings lists the cloud providers available on the website you use. Dropbox is currently supported. Choose **Connect Dropbox**, sign in to your own account, and authorize minijour. Choose a cloud password of at least 12 characters, or enter your existing cloud password. On another device, visit the same site, connect the same account, and unlock with the same cloud password.
 
-If no cloud providers are available, settings shows only local features. You can keep writing offline and downloading ZIP backups.
+If no cloud providers are available, settings explains that cloud sync is unavailable and offers local backups. You can keep writing offline and downloading ZIP backups.
 
 Unlocking combines local entries with the journal in your Dropbox app folder. Sync runs after edits settle, when opening/returning online, and every 30 seconds while visible. Check the saved status before switching devices if you need your latest edit immediately. Uploads cannot be guaranteed while the app is closed or suspended.
 

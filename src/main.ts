@@ -2,7 +2,7 @@
 import * as A from '@automerge/automerge';
 import automergeWasm from '@automerge/automerge/automerge.wasm?url';
 import { registerSW } from 'virtual:pwa-register';
-import { createDay, hasContent, isDate, localDate, type DayDoc } from './domain/day';
+import { localDate } from './domain/day';
 import { Journal } from './domain/journal';
 import { LocalStore } from './storage/local';
 import { exportJournal, importJournal } from './storage/backup';
@@ -11,7 +11,8 @@ import { setupCloudSettings } from './ui/cloud-settings';
 import { setupPhotoCleanup } from './ui/photo-cleanup';
 import { protectStorage } from './storage/persistence';
 import { SyncEngine } from './sync/engine';
-import { DayEditor } from './ui/editor';
+import { JournalView } from './ui/journal-view';
+import { setupDateNavigation } from './ui/date-navigation';
 import { PhotoUrls, preparePhoto } from './ui/photos';
 import { mountShell } from './ui/shell';
 import './style.css';
@@ -31,11 +32,7 @@ async function start(): Promise<void> {
   const local = await LocalStore.open();
   const journal = new Journal(local);
   const urls = new PhotoUrls(local);
-  const editors = new Map<string, DayEditor>();
-  // Blank writing surfaces live only in this tab, outside the saved journal.
-  const drafts = new Map<string, DayDoc>();
-  let activeDate = localDate();
-  let today = activeDate;
+  let today = localDate();
   let syncing = false;
   let cleaning = false;
   let cloudWorking = false;
@@ -49,10 +46,14 @@ async function start(): Promise<void> {
   let syncTimer: ReturnType<typeof setTimeout> | undefined;
   let nextDay: ReturnType<typeof setTimeout>;
   let photoTarget: { date: string; anchor: A.Cursor; head: A.Cursor } | undefined;
-  let openingEditor: DayEditor | undefined;
 
   await journal.load();
   const afterSave = protectStorage(local);
+  const view = new JournalView(ui.journal, journal, urls, {
+    afterSave, notify, canFocus: () => !ui.dialog.open && !ui.dateSidebar.open,
+  });
+  const editors = view.editors;
+  setupDateNavigation(ui, view, notify);
   let justConnected = false;
   try { justConnected = await finishCloudConnection(local, providers); } catch (error) { notify(error); }
 
@@ -108,91 +109,26 @@ async function start(): Promise<void> {
     syncTimer = setTimeout(() => { void sync(); }, 1500);
   }
 
-  function updateDayVisibility(date: string): void {
-    const editor = editors.get(date);
-    if (!editor) return;
-    const section = editor.view.dom.closest<HTMLElement>('.day')!;
-    const filled = hasContent(journal.days.get(date) ?? drafts.get(date)!);
-    section.hidden = !filled && date !== activeDate && !editor.view.hasFocus;
-    section.querySelector<HTMLElement>('.day-heading')!.hidden = !filled;
-    section.classList.toggle('draft', !filled);
-  }
-
-  function renderDay(date: string): void {
-    const doc = journal.days.get(date) ?? drafts.get(date)!;
-    if (journal.days.has(date)) drafts.delete(date);
-    const existing = editors.get(date);
-    if (existing) {
-      existing.receive(doc);
-      updateDayVisibility(date);
-      if (openingEditor === existing && !ui.dialog.open) existing.focusEnd();
-      return;
-    }
-    const section = document.createElement('section');
-    section.className = 'day';
-    section.dataset.date = date;
-    const heading = document.createElement('div');
-    heading.className = 'day-heading';
-    const dateHeading = document.createElement('h2');
-    const time = document.createElement('time');
-    time.dateTime = date; time.textContent = date;
-    dateHeading.append(time);
-    const weekday = document.createElement('span');
-    weekday.className = 'weekday';
-    weekday.textContent = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long' });
-    heading.append(dateHeading, weekday);
-    section.append(heading);
-    const content = document.createElement('div');
-    section.append(content);
-    const following = [...ui.journal.children].find(child => (child as HTMLElement).dataset.date! > date);
-    ui.journal.insertBefore(section, following ?? null);
-    const editor = new DayEditor(content, doc, date, urls, next => {
-      openingEditor = undefined;
-      if (!journal.days.has(date) && !hasContent(next)) {
-        drafts.set(date, next);
-        updateDayVisibility(date);
-        return;
-      }
-      void journal.merge(date, A.save(next)).then(afterSave).catch(notify);
-    }, () => {
-      activeDate = date;
-      for (const day of editors.keys()) updateDayVisibility(day);
-    }, () => updateDayVisibility(date));
-    editors.set(date, editor);
-    updateDayVisibility(date);
-  }
-
   journal.subscribe(event => {
     if (event.date) {
-      renderDay(event.date);
+      view.receive(event.date);
       scheduleSync();
     } else if (event.photos) {
       urls.clear();
-      for (const editor of editors.values()) editor.refreshPhotos();
+      view.refreshPhotos();
       scheduleSync();
     }
     updateStatus();
   });
 
-  for (const date of [...journal.days.keys()].sort()) renderDay(date);
-
-  function openDate(date: string, followOpening = false): void {
-    if (!isDate(date)) throw new Error('Choose a valid calendar date.');
-    if (!journal.days.has(date) && !drafts.has(date)) drafts.set(date, createDay(date));
-    activeDate = date;
-    renderDay(date);
-    for (const day of editors.keys()) updateDayVisibility(day);
-    if (!ui.dialog.open) {
-      openingEditor = followOpening ? editors.get(date) : undefined;
-      editors.get(date)?.focusEnd();
-    }
-  }
-
   async function openToday(focus = true): Promise<void> {
     const date = localDate();
     // Midnight advances ordinary daily writing, without interrupting a date
     // deliberately opened in the past or future.
-    if (focus || (date !== today && activeDate === today)) openDate(date, true);
+    if (focus || (date !== today && view.activeDate === today)) {
+      if (date !== today) view.discardBlank(today);
+      view.openDate(date, true);
+    }
     today = date;
     clearTimeout(nextDay);
     const midnight = new Date();
@@ -206,37 +142,25 @@ async function start(): Promise<void> {
   updateStatus();
 
   // Follow delayed photo layout and keyboard resize only until the person acts.
-  const stopOpeningScroll = () => { openingEditor = undefined; };
+  const stopOpeningScroll = () => view.stopFollowing();
   for (const event of ['pointerdown', 'keydown', 'touchmove', 'wheel']) {
     document.addEventListener(event, stopOpeningScroll, { capture: true, passive: true });
   }
-  const revealOpening = () => { if (!ui.dialog.open) openingEditor?.revealEnd(); };
+  const revealOpening = () => view.revealOpening();
   ui.journal.addEventListener('load', revealOpening, true);
   window.visualViewport?.addEventListener('resize', revealOpening);
 
   ui.settingsButton.onclick = () => {
-    closePhotoMenu(); ui.entryDate.value = activeDate;
+    closePhotoMenu();
     ui.dialog.append(ui.notice); ui.dialog.showModal();
   };
   ui.statusButton.onclick = () => ui.settingsButton.click();
-  const dateSettings = ui.dateForm.closest<HTMLDetailsElement>('details')!;
-  dateSettings.ontoggle = () => { if (dateSettings.open) dateSettings.scrollIntoView({ block: 'nearest' }); };
-  ui.dateForm.onsubmit = event => {
-    event.preventDefault();
-    try {
-      const date = ui.entryDate.value;
-      if (!isDate(date)) throw new Error('Choose a valid calendar date.');
-      dateSettings.open = false;
-      ui.dialog.close();
-      openDate(date);
-    } catch (error) { notify(error); }
-  };
   ui.closeSettings.onclick = () => ui.dialog.close();
   ui.dialog.addEventListener('click', event => { if (event.target === ui.dialog && event.clientX) {
     const box = ui.dialog.getBoundingClientRect();
     if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) ui.dialog.close();
   } });
-  ui.dialog.addEventListener('close', () => { document.body.append(ui.notice); editors.get(activeDate)?.view.focus(); });
+  ui.dialog.addEventListener('close', () => { document.body.append(ui.notice); editors.get(view.activeDate)?.view.focus(); });
   ui.export.onclick = () => { void (async () => {
     ui.export.disabled = true;
     try {
@@ -264,11 +188,10 @@ async function start(): Promise<void> {
   ui.photoButton.onpointerdown = event => { event.preventDefault(); };
   ui.photoButton.onclick = () => {
     if (!ui.photoMenu.hidden) { closePhotoMenu(); return; }
-    const editor = editors.get(activeDate);
-    if (!editor) return;
+    const editor = view.expandActive();
     const selection = editor.view.state.selection.main;
     photoTarget = {
-      date: activeDate,
+      date: view.activeDate,
       anchor: A.getCursor(editor.doc, ['text'], selection.anchor),
       head: A.getCursor(editor.doc, ['text'], selection.head),
     };

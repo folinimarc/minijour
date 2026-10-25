@@ -6,8 +6,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Added
 
-- A collapsed date picker in settings for writing on any past or future date, with entries kept in chronological order.
-- Device storage protection status, one-time advice when protection is unavailable, and an explicit request button in settings.
+- A collapsible date sidebar for navigation, opening past or future dates, and deleting entries after confirmation.
 
 ### Changed
 
@@ -16,7 +15,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 - Use the journal's book logo and wordmark styling on the landing page as well.
 - Shorten the landing page, simplify its storage summary, and remove promotional taglines.
 - Keep the journal header visible while scrolling and open at the end of today's entry.
-- Ignore unwritten dates: drafts have no date heading and are not saved, synced, or exported until text or a photo is added. Cleared entries retain internal history for safe merging, without appearing as empty journal entries.
+- Show entries newest first, with only the three most recent dates expanded by default and older editors created when opened.
+- Show date headings on empty local drafts without saving, syncing, or exporting unwritten entries. Cleared entries retain internal history for safe merging.
 - Support exporting and restoring journals with no saved entries, while retaining compatibility with older backups.
 
 ## 0.1.0 - 2026-10-25

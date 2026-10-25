@@ -1,13 +1,16 @@
 import { expect, type Page } from '@playwright/test';
+import * as A from '@automerge/automerge';
+import { zipSync } from 'fflate';
+import { createDay, editDay } from '../../src/domain/day';
 
 export async function openJournal(page: Page) {
   await page.goto('./journal/');
-  await expect(page.locator('.cm-content').last()).toBeVisible();
+  await expect(page.locator('.cm-content').first()).toBeVisible();
 }
 
 export async function openDate(page: Page, date: string) {
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
-  await page.getByText('Write on another date', { exact: true }).click();
+  await page.getByRole('button', { name: 'Browse dates' }).click();
+  await page.getByText('Add a date', { exact: true }).click();
   await page.getByLabel('Entry date', { exact: true }).fill(date);
   await page.getByRole('button', { name: 'Open date', exact: true }).click();
   await expect(page.locator(`[data-date="${date}"] .cm-content`)).toBeFocused();
@@ -30,7 +33,7 @@ export async function addTestPhoto(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Add a photo', exact: true }).click();
   await page.locator('#photo-input').setInputFiles('public/icon-192.png');
   await expect(page.locator('.photo-preview img')).toBeVisible();
-  return (await page.locator('.cm-content').innerText()).match(/photos\/([a-f0-9-]{36}\.jpg)/)![1];
+  return (await page.locator('.cm-content:focus').innerText()).match(/photos\/([a-f0-9-]{36}\.jpg)/)![1];
 }
 export async function replaceEntry(page: Page, text = '') {
   await page.locator('.cm-content').click();
@@ -72,5 +75,15 @@ export async function sync(page: Page) {
   await page.getByRole('button', { name: 'Settings and backup' }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
+  await page.getByRole('button', { name: 'Close settings' }).click();
+}
+
+export async function restoreDays(page: Page, days: Record<string, string>) {
+  const files = Object.fromEntries(Object.entries(days).map(([date, text]) => [
+    `minijour/${date}.automerge`, A.save(editDay(createDay(date), text)),
+  ]));
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.locator('#restore-input').setInputFiles({ name: 'test.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync(files)) });
+  await expect(page.getByRole('alert')).toContainText('Backup restored');
   await page.getByRole('button', { name: 'Close settings' }).click();
 }

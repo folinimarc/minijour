@@ -61,7 +61,7 @@ export class DayEditor {
   private displayedDoc: DayDoc;
 
   constructor(parent: HTMLElement, doc: DayDoc, date: string, urls: PhotoUrls,
-    onEdit: (doc: DayDoc) => void, onFocus: (editor: DayEditor) => void, onBlur: () => void) {
+    onEdit: (doc: DayDoc) => void, onFocus: (editor: DayEditor) => void) {
     this.displayedDoc = doc;
     this.view = new EditorView({
       parent,
@@ -84,7 +84,6 @@ export class DayEditor {
           photoPreviews(urls),
           EditorView.domEventHandlers({
             focus: () => { onFocus(this); },
-            blur: onBlur,
             compositionend: () => {
               // Never disturb Android keyboard composition with incoming edits.
               setTimeout(() => {

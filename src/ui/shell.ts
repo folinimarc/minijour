@@ -4,13 +4,28 @@ import { icon } from './icons';
 export function mountShell() {
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <header class="topbar">
-      <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
+      <div class="topbar-left">
+        <button id="dates-button" class="icon-button" aria-label="Browse dates" title="Browse dates" aria-expanded="false" aria-controls="date-sidebar">${icon('dates')}</button>
+        <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
+      </div>
       <div class="topbar-right">
         <button id="status-button" class="status-button" aria-label="Cloud storage and sync settings"><span id="status" class="status" role="status"><span id="cloud-warning" class="cloud-warning" hidden>${icon('warning')}</span><span class="status-dot"></span><span id="status-text">Opening your journal…</span></span></button>
         <button id="settings-button" class="icon-button" aria-label="Settings and backup" title="Settings and backup">${icon('settings')}</button>
       </div>
     </header>
     <main id="journal" aria-label="Your journal" aria-busy="true"></main>
+    <dialog id="date-sidebar" class="date-sidebar" aria-labelledby="dates-title">
+      <div class="dialog-header"><h1 id="dates-title">Dates</h1><button id="close-dates" class="icon-button" aria-label="Close dates">${icon('close')}</button></div>
+      <nav aria-label="Journal dates"><ul id="date-list" class="date-list"></ul></nav>
+      <details class="add-date">
+        <summary>Add a date</summary>
+        <form id="date-form">
+          <label for="entry-date">Entry date</label>
+          <input id="entry-date" type="date" required />
+          <button class="secondary-button" type="submit">Open date</button>
+        </form>
+      </details>
+    </dialog>
     <div class="photo-tools">
       <div id="photo-menu" class="photo-menu" role="group" aria-label="Add a photo" hidden>
         <button id="camera-button">${icon('camera')}Take a photo</button>
@@ -67,16 +82,6 @@ export function mountShell() {
         </div>
       </section>
       <section class="settings-section settings-small">
-        <details class="advanced-settings">
-          <summary>Write on another date</summary>
-          <form id="date-form">
-            <label for="entry-date">Entry date</label>
-            <div class="button-row"><input id="entry-date" type="date" required /><button class="secondary-button" type="submit">Open date</button></div>
-          </form>
-          <p class="help">Choose a past or future date. Entries stay in date order. A blank draft is saved only when you add text or a photo.</p>
-        </details>
-      </section>
-      <section class="settings-section settings-small">
         <h2>Install</h2>
         <p>Install from your browser’s menu, or choose <strong>Add to Home Screen</strong> from the Share menu. After the first visit and offline installation, you can write without a connection.</p>
         <button id="install-button" class="secondary-button" hidden>Install minijour</button>
@@ -100,6 +105,8 @@ export function mountShell() {
     disconnect: get<HTMLButtonElement>('disconnect-button'),
     sync: get<HTMLButtonElement>('sync-button'), export: get<HTMLButtonElement>('export-button'),
     restore: get<HTMLButtonElement>('restore-button'),
+    datesButton: get<HTMLButtonElement>('dates-button'), dateSidebar: get<HTMLDialogElement>('date-sidebar'),
+    closeDates: get<HTMLButtonElement>('close-dates'), dateList: get<HTMLUListElement>('date-list'),
     dateForm: get<HTMLFormElement>('date-form'), entryDate: get<HTMLInputElement>('entry-date'),
     cloudSection: get<HTMLElement>('cloud-section'), providerList: get<HTMLDivElement>('cloud-providers'),
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),

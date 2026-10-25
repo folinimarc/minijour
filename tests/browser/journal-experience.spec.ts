@@ -1,20 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import * as A from '@automerge/automerge';
-import { zipSync } from 'fflate';
 import { createDay, editDay } from '../../src/domain/day';
-import { addTestPhoto, openDate, openJournal, replaceEntry, storedDates } from './helpers';
+import { addTestPhoto, openDate, openJournal, replaceEntry, restoreDays, storedDates } from './helpers';
 
 const TODAY = '2026-10-25';
 
-async function restoreDays(page: Page, days: Record<string, string>) {
-  const files = Object.fromEntries(Object.entries(days).map(([date, text]) => [
-    `minijour/${date}.automerge`, A.save(editDay(createDay(date), text)),
-  ]));
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
-  await page.locator('#restore-input').setInputFiles({ name: 'test.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync(files)) });
-  await expect(page.getByRole('alert')).toContainText('Backup restored');
-  await page.getByRole('button', { name: 'Close settings' }).click();
-}
 
 async function mockStorage(page: Page, mode: 'denied' | 'granted' | 'unsupported' | 'error' = 'denied') {
   await page.addInitScript(mode => {
@@ -66,11 +55,11 @@ test('opens at the end of today, keeps the header visible, and preserves deliber
   await expect(page.locator('.topbar')).toBeInViewport({ ratio: 0.99 });
 });
 
-test('hides older blank dates, preserves focused undo, and reveals entries received from another tab', async ({ page, context }) => {
+test('shows headings for opened empty dates, preserves undo, and reveals incoming entries', async ({ page, context }) => {
   await page.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
   await openJournal(page);
   await restoreDays(page, { '2026-10-23': ' \n\t', '2026-10-24': 'An older memory.' });
-  await expect(page.locator('.day-heading:visible time')).toHaveText(['2026-10-24']);
+  await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2026-10-24']);
   const older = page.locator('[data-date="2026-10-24"] .cm-content');
   await older.click(); await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
   await expect(older).toBeFocused();
@@ -79,15 +68,15 @@ test('hides older blank dates, preserves focused undo, and reveals entries recei
   await expect(older).toContainText('An older memory.');
   await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
   await openDate(page, TODAY);
-  await expect(older).toBeHidden();
-  await expect(page.locator('.day-heading:visible')).toHaveCount(0);
+  await expect(older).toBeVisible();
+  await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2026-10-24']);
   await expect(page.locator('.day:visible').first()).toHaveCSS('border-top-width', '0px');
   const other = await context.newPage();
   await other.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
   await openJournal(other);
   await restoreDays(other, { '2026-10-23': 'An entry from another tab.' });
   await expect(page.locator('[data-date="2026-10-23"] .cm-content')).toBeVisible();
-  await expect(page.locator('.day-heading:visible time')).toHaveText(['2026-10-23']);
+  await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2026-10-24', '2026-10-23']);
 });
 
 test('keeps the opening cursor visible when a photo finishes loading later', async ({ page }) => {
@@ -122,7 +111,7 @@ test('advances the writing draft at midnight without saving empty dates', async 
   await page.clock.runFor(2100);
   await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);
   await expect(page.locator(`[data-date="${TODAY}"] .cm-content`)).toBeFocused();
-  await expect(page.locator('.day-heading:visible')).toHaveCount(0);
+  await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY]);
   expect(await storedDates(page)).toEqual([]);
   await page.reload();
   await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);

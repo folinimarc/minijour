@@ -11,7 +11,7 @@ minijour is an installable, offline-capable web app. It saves on your device fir
 - Installed apps launch straight into the journal; the website home page explains the app.
 - Opens at today's date, ready to write. Changes save automatically.
 - Lets you take or choose a photo and insert it at the cursor.
-- Displays one chronological page and exports one Markdown file with its photos.
+- Shows newest entries first, with collapsible dates and a small date sidebar. Exports one Markdown file with its photos.
 - Works offline after installation, with optional encrypted cloud sync when online.
 - Offers explicit cleanup of unused photos; removing a Markdown link alone preserves the image for undo.
 
