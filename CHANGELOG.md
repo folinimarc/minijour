@@ -4,6 +4,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+## 0.1.0 - 2026-10-25
+
 ### Added
 
 - Explicit unused-photo cleanup with size/count review, confirmation, encrypted deletion records, and safe retries across devices.
