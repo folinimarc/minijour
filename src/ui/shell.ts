@@ -4,13 +4,13 @@ import { icon } from './icons';
 export function mountShell() {
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <header class="topbar">
-      <div class="topbar-left">
-        <button id="dates-button" class="icon-button" aria-label="Browse dates" title="Browse dates" aria-expanded="false" aria-controls="date-sidebar">${icon('dates')}</button>
-        <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
-      </div>
+      <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
       <div class="topbar-right">
         <button id="status-button" class="status-button" aria-label="Cloud storage and sync settings"><span id="status" class="status" role="status"><span id="cloud-warning" class="cloud-warning" hidden>${icon('warning')}</span><span class="status-dot"></span><span id="status-text">Opening your journal…</span></span></button>
-        <button id="settings-button" class="icon-button" aria-label="Settings and backup" title="Settings and backup">${icon('settings')}</button>
+        <div class="header-actions">
+          <button id="dates-button" class="header-button" aria-expanded="false" aria-controls="date-sidebar">Dates</button>
+          <button id="settings-button" class="header-button">Settings</button>
+        </div>
       </div>
     </header>
     <main id="journal" aria-label="Your journal" aria-busy="true"></main>
@@ -42,7 +42,7 @@ export function mountShell() {
       <div class="dialog-header"><h1 id="settings-title">Settings</h1><button id="close-settings" class="icon-button" aria-label="Close settings">${icon('close')}</button></div>
       <section id="cloud-section" class="settings-section">
         <h2>${icon('cloud')}Cloud sync</h2>
-        <p id="connection-description">Your journal saves on this device. Clearing browser data can remove it. Connect your own cloud account for encrypted sync.</p>
+        <p id="connection-description">Your journal saves on this device. Clearing browser data can remove it. Connect your own cloud account for encrypted cloud storage and sync across your devices.</p>
         <div id="cloud-providers" class="button-row" hidden></div>
         <div id="cloud-connected" class="button-row" hidden>
           <button id="sync-button" class="primary-button">Sync now</button>

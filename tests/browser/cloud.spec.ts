@@ -15,7 +15,10 @@ test('does not sync blank drafts, and a cleared future entry stays cleared on an
   await page.keyboard.insertText('A future memory.'); await sync(page);
   const fresh = await browser.newContext({ serviceWorkers: 'block' }); await mock.install(fresh);
   const other = await fresh.newPage(); await openJournal(other); await connect(other);
+  await openDate(other, '2030-01-02');
   await expect(other.locator('[data-date="2030-01-02"] .cm-content')).toContainText('A future memory.');
+  await other.reload();
+  await expect(other.locator('.cm-content')).toBeFocused();
   await page.locator('[data-date="2030-01-02"] .cm-content').click();
   await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
   await sync(page); await sync(other);
@@ -63,11 +66,12 @@ test('offers only configured cloud providers and uses deployment credentials wit
   const mock = new DropboxMock();
   await mock.install(context);
   await openJournal(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByLabel('Dropbox app key', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('OAuth redirect URI')).toHaveCount(0);
   await expect(page.locator('#cloud-section details, #app-key, #redirect-uri')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Cloud sync', exact: true })).toBeVisible();
+  await expect(page.locator('#connection-description')).toContainText('encrypted cloud storage and sync across your devices');
   await expect(page.locator('#cloud-providers button')).toHaveCount(1);
   const authorization = page.waitForRequest(request => request.url().startsWith('https://www.dropbox.com/oauth2/authorize?'));
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
@@ -81,7 +85,7 @@ test('blocks a different Dropbox account without sending it any journal data', a
   await openJournal(page);
   await page.keyboard.insertText('Keep this journal in its original account.');
   await connect(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Connect Dropbox', exact: true })).toBeVisible();
   const previousCalls = mock.apiCalls;
@@ -101,7 +105,7 @@ test('keeps cloud locked after reload unless remembering was requested, and neve
   const mock = new DropboxMock(); await mock.install(context);
   await openJournal(page); await page.keyboard.insertText('Private memory.');
   await connect(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Lock cloud', exact: true }).click();
   await expect(page.getByLabel('Cloud password', { exact: true })).toBeVisible();
   await page.getByLabel('Cloud password', { exact: true }).fill('incorrect password');
@@ -115,7 +119,7 @@ test('keeps cloud locked after reload unless remembering was requested, and neve
   await page.keyboard.press('End'); await page.keyboard.insertText(' Local writing still works.');
   await expect(page.getByRole('status')).toHaveText('Cloud storage locked');
   expect(mock.revision).toBe(writes);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Unlock cloud', exact: true })).toBeVisible();
   await unlock(page, true);
   await page.reload();
@@ -131,7 +135,7 @@ test('keeps cloud locked after reload unless remembering was requested, and neve
 test('requires matching passwords on setup and keeps local writing available after interrupted cloud checks', async ({ page, context }) => {
   const mock = new DropboxMock(); await mock.install(context);
   await openJournal(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
   await page.getByLabel('Cloud password', { exact: true }).fill(PASSWORD);
   await page.getByLabel('Repeat cloud password').fill('different password');
@@ -147,7 +151,7 @@ test('requires matching passwords on setup and keeps local writing available aft
   await expect(page.getByRole('status')).toHaveText('Cloud storage locked');
   await page.getByRole('button', { name: 'Add a photo', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Choose from device' })).toBeVisible();
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry cloud connection' })).toBeVisible();
 });
 
@@ -161,11 +165,12 @@ test('imports older plaintext Dropbox entries and photos explicitly without modi
   await mock.install(context);
   await openJournal(page); await connect(page);
   await expect(page.locator('.cm-content')).not.toContainText('Older private memory.');
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.locator('#legacy-cloud')).toContainText('unencrypted files remain');
   await page.getByRole('button', { name: 'Import older cloud files' }).click();
   await expect(page.getByRole('alert')).toContainText('Older files imported');
   await page.getByRole('button', { name: 'Close settings' }).click();
+  await openDate(page, '2020-01-01');
   await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toContainText('Older private memory.');
   expect(mock.files.get(path)!.bytes).toEqual(original);
   expect([...mock.files.keys()].filter(name => name.startsWith('/minijour-v1/'))).toHaveLength(2);
@@ -187,10 +192,10 @@ test('finishes a sign-in started by an older app at the root redirect URI', asyn
 test('does not remember a key when another tab disconnects during unlock', async ({ page, context }) => {
   const mock = new DropboxMock(); await mock.install(context);
   await openJournal(page); await connect(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Lock cloud', exact: true }).click();
   const other = await context.newPage(); await openJournal(other);
-  await other.getByRole('button', { name: 'Settings and backup' }).click();
+  await other.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(other.getByRole('button', { name: 'Unlock cloud', exact: true })).toBeEnabled();
 
   let release!: () => void;
@@ -242,7 +247,7 @@ test('syncs encrypted cleanup to an offline device without re-uploading its reta
   await second.keyboard.insertText(`\nAn offline copy: ![Photo](photos/${name})`);
   await replaceEntry(first, 'Removed on the phone.'); await sync(first);
   const before = new Set(mock.files.keys());
-  await first.getByRole('button', { name: 'Settings and backup' }).click();
+  await first.getByRole('button', { name: 'Settings', exact: true }).click();
   await first.getByRole('button', { name: 'Clean up unused photos' }).click();
   await first.getByRole('button', { name: 'Permanently delete photos' }).click();
   await expect(first.getByRole('alert')).toContainText('Permanently removed 1 unused photo');
@@ -265,7 +270,7 @@ test('requires unlocked online Dropbox access before cleanup and retries interru
   await openJournal(page); const name = await addTestPhoto(page); await connect(page);
   await replaceEntry(page, 'Photo removed from this entry.'); await sync(page);
   await context.setOffline(true);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Clean up unused photos' }).click();
   await expect(page.getByRole('alert')).toContainText('Go online');
   await expect(page.locator('#photo-cleanup-review')).toBeHidden();
@@ -277,7 +282,7 @@ test('requires unlocked online Dropbox access before cleanup and retries interru
   await expect(page.getByRole('alert')).toContainText('Connect and unlock');
   expect(await storedPhotos(page)).toEqual([name]);
   await unlock(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Clean up unused photos' }).click();
   mock.deleteFailures = 1;
   mock.deleteAlreadyMissing = true; // Retry sees Dropbox path_lookup/not_found.
@@ -295,7 +300,7 @@ test('waits for an in-progress legacy import before allowing cleanup', async ({ 
   mock.files.set(path, { bytes: Buffer.from(A.save(editDay(createDay('2020-01-01'), 'An older entry.'))), revision: 'old' });
   await mock.install(context);
   await openJournal(page); await connect(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   let release!: () => void, reached!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
   const waiting = new Promise<void>(resolve => { reached = resolve; });
@@ -317,7 +322,7 @@ test('honors cancellation while the confirmation sync is still in flight', async
   const mock = new DropboxMock(); await mock.install(context);
   await openJournal(page); const name = await addTestPhoto(page); await connect(page);
   await replaceEntry(page, 'Removed photo reference.'); await sync(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Clean up unused photos' }).click();
   await expect(page.locator('#photo-cleanup-summary')).toContainText('1 unused photo');
   let release!: () => void, reached!: () => void;
@@ -345,8 +350,11 @@ test('deletes an entry from the date drawer across devices while retaining photo
   await page.keyboard.insertText('A memory to delete.'); await sync(page);
   const fresh = await browser.newContext({ serviceWorkers: 'block' }); await mock.install(fresh);
   const other = await fresh.newPage(); await openJournal(other); await connect(other);
+  await openDate(other, '2020-02-29');
   await expect(other.locator('[data-date="2020-02-29"] .cm-content')).toContainText('A memory to delete.');
-  await page.getByRole('button', { name: 'Browse dates' }).click();
+  await other.reload();
+  await expect(other.locator('.cm-content')).toBeFocused();
+  await page.getByRole('button', { name: 'Dates', exact: true }).click();
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Delete entry for 2020-02-29' }).click();
   await expect(page.getByRole('button', { name: '2020-02-29', exact: true })).toHaveCount(0);

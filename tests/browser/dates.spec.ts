@@ -37,7 +37,7 @@ test('shows blank date headings without saving drafts and puts newest entries fi
 
 test('allows a photo-only entry on an arbitrary date and keeps the date control tucked away', async ({ page }) => {
   await openJournal(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByLabel('Entry date', { exact: true })).toBeHidden();
   await page.getByRole('button', { name: 'Close settings' }).click();
   await openDate(page, '2020-02-29');
@@ -47,13 +47,15 @@ test('allows a photo-only entry on an arbitrary date and keeps the date control 
   await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2020-02-29']);
   await expect.poll(() => storedDates(page)).toEqual(['2020-02-29']);
   await page.reload();
+  await expect(page.locator('[data-date="2020-02-29"] .day-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await openDate(page, '2020-02-29');
   await expect(page.locator('[data-date="2020-02-29"] .photo-preview img')).toBeVisible();
   await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2020-02-29']);
 });
 
 test('rejects a missing date without creating or saving a section', async ({ page }) => {
   await openJournal(page);
-  await page.getByRole('button', { name: 'Browse dates' }).click();
+  await page.getByRole('button', { name: 'Dates', exact: true }).click();
   await page.getByText('Add a date', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open date', exact: true })).toBeInViewport({ ratio: 0.99 });
   await page.screenshot({ path: 'test-results/date-settings-mobile.png' });

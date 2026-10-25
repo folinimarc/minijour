@@ -9,20 +9,22 @@ export function setupDateNavigation(
 ): void {
   let rendered = '';
   const refresh = () => {
-    const dates = view.dates;
+    const today = localDate();
+    const dates = [today, ...view.dates.filter(date => date !== today)];
     const key = dates.join(',');
     if (key !== rendered) {
       rendered = key;
       const rows = dates.map(date => {
         const row = document.createElement('li');
+        if (date === today) row.className = 'today-date';
         const link = document.createElement('button');
-        link.className = 'date-link'; link.textContent = date; link.value = date;
+        link.className = 'date-link'; link.textContent = date === today ? `Today (${date})` : date; link.value = date;
         link.onclick = () => { ui.dateSidebar.close(); view.openDate(date); };
         const remove = document.createElement('button');
         remove.className = 'icon-button delete-date'; remove.innerHTML = icon('trash');
         remove.setAttribute('aria-label', `Delete entry for ${date}`);
         remove.onclick = () => {
-          if (!confirm(`Delete the entry for ${date}? Its text will be removed from your journal. Photo files stay until you clean them up.`)) return;
+          if (!confirm(`Delete the entry for ${date}? Its text will be removed from your journal. Photo files stay until you clean them up through the settings.`)) return;
           remove.disabled = true;
           void view.deleteDate(date).catch(notify).finally(() => { remove.disabled = false; });
         };

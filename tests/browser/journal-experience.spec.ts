@@ -1,9 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createDay, editDay } from '../../src/domain/day';
 import { addTestPhoto, openDate, openJournal, replaceEntry, restoreDays, storedDates } from './helpers';
 
 const TODAY = '2026-10-25';
-
 
 async function mockStorage(page: Page, mode: 'denied' | 'granted' | 'unsupported' | 'error' = 'denied') {
   await page.addInitScript(mode => {
@@ -60,6 +58,7 @@ test('shows headings for opened empty dates, preserves undo, and reveals incomin
   await openJournal(page);
   await restoreDays(page, { '2026-10-23': ' \n\t', '2026-10-24': 'An older memory.' });
   await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2026-10-24']);
+  await openDate(page, '2026-10-24');
   const older = page.locator('[data-date="2026-10-24"] .cm-content');
   await older.click(); await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
   await expect(older).toBeFocused();
@@ -68,14 +67,16 @@ test('shows headings for opened empty dates, preserves undo, and reveals incomin
   await expect(older).toContainText('An older memory.');
   await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
   await openDate(page, TODAY);
-  await expect(older).toBeVisible();
+  await expect(older).toBeHidden();
   await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2026-10-24']);
   await expect(page.locator('.day:visible').first()).toHaveCSS('border-top-width', '0px');
   const other = await context.newPage();
   await other.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
   await openJournal(other);
   await restoreDays(other, { '2026-10-23': 'An entry from another tab.' });
-  await expect(page.locator('[data-date="2026-10-23"] .cm-content')).toBeVisible();
+  await expect(page.locator('[data-date="2026-10-23"] .day-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await openDate(page, '2026-10-23');
+  await expect(page.locator('[data-date="2026-10-23"] .cm-content')).toContainText('An entry from another tab.');
   await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2026-10-24', '2026-10-23']);
 });
 

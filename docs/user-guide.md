@@ -8,11 +8,11 @@ Choose **Open journal** from the information page, or open `/journal/` directly.
 
 Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have inline previews; their Markdown links remain editable.
 
-Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **…** for cloud sync, backups, and installation information.
+Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **Settings** for cloud sync, backups, and installation information.
 
-Entries appear newest first. The three most recent dates start expanded; select a date heading to collapse or expand it. Today's date heading is visible even before you write. Blank drafts are not saved, synced, or exported, and disappear when you reopen the app. Adding text or a photo saves the entry.
+Entries appear newest first. Only today starts expanded; select a date heading to collapse or expand it. Today's date heading is visible even before you write. Blank drafts are not saved, synced, or exported, and disappear when you reopen the app. Adding text or a photo saves the entry.
 
-Choose the calendar button beside the logo to browse all dates. Selecting a date expands its entry and moves the cursor there. **Add a date** opens any past or future date; an existing date opens its current entry. Opening the app always returns to today. Daily rollover does not interrupt a past or future date you deliberately opened.
+Choose **Dates** beside **Settings** to browse all dates. **Today (YYYY-MM-DD)** stays at the top, above any future dates. Selecting a date expands its entry, collapses the others, and moves the cursor there. **Add a date** opens any past or future date; an existing date opens its current entry. Opening the app always returns to today. Daily rollover does not interrupt a past or future date you deliberately opened.
 
 The bin beside a date deletes its current text after confirmation. Photos remain in storage until you clean them up separately. Today's empty writing surface remains available. Deleting or clearing an entry retains its Automerge history for sync, rather than erasing old checkpoints or backups. Concurrent edits can still merge into that date. Cleared dates opened in this session keep their heading and editor for undo; after reloading, only dates with content and today's draft appear.
 
@@ -62,7 +62,7 @@ The browser may grant or decline protection; writing still saves either way. The
 
 ## Clean up unused photos
 
-Removing a photo link from Markdown keeps its file available for undo. Choose **… → Clean up unused photos** to review the number of unused photos and their size. Nothing is removed until you choose **Permanently delete photos**; **Cancel** keeps them.
+Removing a photo link from Markdown keeps its file available for undo. Choose **Settings → Clean up unused photos** to review the number of unused photos and their size. Nothing is removed until you choose **Permanently delete photos**; **Cancel** keeps them.
 
 Cleanup checks references across all days, and rechecks after confirmation. A photo still used anywhere is kept. A journal linked to cloud storage requires an online connection and unlocked access to its original account, including after disconnecting. It syncs before each review and deletion. A journal never linked to cloud storage can be cleaned up offline.
 

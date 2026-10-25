@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { unzipSync } from 'fflate';
 import { expect, test } from '@playwright/test';
-import { openJournal, addTestPhoto, replaceEntry, storedPhotos } from './helpers';
+import { openDate, openJournal, addTestPhoto, replaceEntry, storedPhotos } from './helpers';
 
 test('opens ready to write, saves Markdown, and restores it without another heading', async ({ page }) => {
   const errors: string[] = [];
@@ -59,7 +59,9 @@ test('prepends the new local day once after midnight', async ({ page }) => {
   await page.keyboard.insertText('Sunday memory.');
   await page.reload();
   await expect(page.locator('.day')).toHaveCount(2);
+  await openDate(page, '2026-10-24');
   await expect(page.locator('[data-date="2026-10-24"] .cm-content')).toContainText('Saturday memory.');
+  await openDate(page, '2026-10-25');
   await expect(page.locator('[data-date="2026-10-25"] .cm-content')).toContainText('Sunday memory.');
 });
 
@@ -115,7 +117,7 @@ test('does not replace a newer edit with an older queued composition update', as
 test('downloads a complete backup and restores it on a fresh device', async ({ page, browser }, testInfo) => {
   await openJournal(page);
   await page.keyboard.insertText('A memory to take with me.');
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download backup' }).click();
   const backup = await download;
@@ -124,7 +126,7 @@ test('downloads a complete backup and restores it on a fresh device', async ({ p
   const fresh = await browser.newContext();
   const restored = await fresh.newPage();
   await openJournal(restored);
-  await restored.getByRole('button', { name: 'Settings and backup' }).click();
+  await restored.getByRole('button', { name: 'Settings', exact: true }).click();
   await restored.locator('#restore-input').setInputFiles(file);
   await expect(restored.getByRole('alert')).toContainText('Backup restored');
   await restored.getByRole('button', { name: 'Close settings' }).click();
@@ -134,7 +136,7 @@ test('downloads a complete backup and restores it on a fresh device', async ({ p
 
 test('identifies the version and serves licensing beside the installed app', async ({ page, request, baseURL }) => {
   await openJournal(page);
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const build = await (await request.get(new URL('build.json', baseURL!).href)).json();
   await expect(page.locator('.app-version')).toHaveText(build.version);
   await expect(page.getByRole('link', { name: 'Source for this build' })).toHaveAttribute('href', build.sourceUrl);
@@ -150,7 +152,7 @@ test('identifies the version and serves licensing beside the installed app', asy
 test('reviews unused photos, supports cancel, excludes unused images from ZIPs, and cleans up offline', async ({ page, context }, testInfo) => {
   await openJournal(page); const name = await addTestPhoto(page);
   await replaceEntry(page, 'A memory without the photo.');
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download backup' }).click();
   const path = testInfo.outputPath('without-unused-photos.zip');
@@ -181,7 +183,7 @@ test('reviews unused photos, supports cancel, excludes unused images from ZIPs, 
 test('keeps a reviewed photo when another tab adds a reference before confirmation', async ({ page, context }) => {
   await openJournal(page); const name = await addTestPhoto(page);
   await replaceEntry(page, 'Removed the image.');
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Clean up unused photos' }).click();
   await expect(page.locator('#photo-cleanup-summary')).toContainText('1 unused photo');
   const other = await context.newPage(); await openJournal(other);
@@ -218,7 +220,7 @@ test('shows local journaling without provider choices or setup controls when non
   }));
   await page.reload();
   await expect(page.locator('.cm-content')).toContainText('My local journal.');
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Cloud sync', exact: true })).toBeVisible();
   await expect(page.locator('#cloud-providers button')).toHaveCount(0);
   await expect(page.locator('#connection-description')).toContainText('Cloud sync is unavailable on this website');

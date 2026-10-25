@@ -130,6 +130,7 @@ async function start(): Promise<void> {
       view.openDate(date, true);
     }
     today = date;
+    view.onDatesChange();
     clearTimeout(nextDay);
     const midnight = new Date();
     midnight.setHours(24, 0, 0, 0);

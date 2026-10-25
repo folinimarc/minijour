@@ -15,7 +15,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 - Use the journal's book logo and wordmark styling on the landing page as well.
 - Shorten the landing page, simplify its storage summary, and remove promotional taglines.
 - Keep the journal header visible while scrolling and open at the end of today's entry.
-- Show entries newest first, with only the three most recent dates expanded by default and older editors created when opened.
+- Show entries newest first, with only today expanded on opening and older editors created when needed. Sidebar navigation collapses other entries and keeps a Today shortcut at the top.
+- Place labeled Dates and Settings buttons together and clarify encrypted cloud storage, device sync, and photo cleanup after entry deletion.
 - Show date headings on empty local drafts without saving, syncing, or exporting unwritten entries. Cleared entries retain internal history for safe merging.
 - Support exporting and restoring journals with no saved entries, while retaining compatibility with older backups.
 

@@ -9,7 +9,7 @@ export async function openJournal(page: Page) {
 }
 
 export async function openDate(page: Page, date: string) {
-  await page.getByRole('button', { name: 'Browse dates' }).click();
+  await page.getByRole('button', { name: 'Dates', exact: true }).click();
   await page.getByText('Add a date', { exact: true }).click();
   await page.getByLabel('Entry date', { exact: true }).fill(date);
   await page.getByRole('button', { name: 'Open date', exact: true }).click();
@@ -55,7 +55,7 @@ export async function storedPhotos(page: Page): Promise<string[]> {
 }
 
 export async function connect(page: Page) {
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
   await unlock(page);
 }
@@ -72,7 +72,7 @@ export async function unlock(page: Page, remember = true) {
 }
 
 export async function sync(page: Page) {
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
   await page.getByRole('button', { name: 'Close settings' }).click();
@@ -82,7 +82,7 @@ export async function restoreDays(page: Page, days: Record<string, string>) {
   const files = Object.fromEntries(Object.entries(days).map(([date, text]) => [
     `minijour/${date}.automerge`, A.save(editDay(createDay(date), text)),
   ]));
-  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.locator('#restore-input').setInputFiles({ name: 'test.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync(files)) });
   await expect(page.getByRole('alert')).toContainText('Backup restored');
   await page.getByRole('button', { name: 'Close settings' }).click();

@@ -4,7 +4,9 @@
 html { scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top) + 16px); }
 .topbar { position: sticky; top: 0; z-index: 10; height: calc(var(--header-height) + env(safe-area-inset-top)); max-width: 1160px; padding: env(safe-area-inset-top) 44px 0; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--paper); border-bottom: 1px solid var(--line); }
 .topbar-right { display: flex; align-items: center; gap: 16px; }
-.topbar-left { display: flex; align-items: center; gap: 8px; }
+.header-actions { display: flex; align-items: center; gap: 6px; }
+.header-button { min-height: 36px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; font-size: 12px; color: var(--muted); }
+.header-button:hover { color: var(--ink); background: var(--surface); }
 .status-button { padding: 8px 0; border: 0; background: transparent; color: inherit; text-align: left; }
 .status { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); letter-spacing: .1px; }
 .cloud-warning { display: inline-flex; color: #9b794c; }
@@ -73,6 +75,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 1
 .date-sidebar nav { overflow-y: auto; min-height: 0; flex: 1; }
 .date-list { list-style: none; padding: 0; margin: 0; }
 .date-list li { display: flex; align-items: center; gap: 8px; }
+.date-list .today-date { position: sticky; top: 0; z-index: 1; background: var(--surface); }
 .date-link { flex: 1; padding: 12px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); text-align: left; font-size: 13px; }
 .date-link:hover, .date-link[aria-current] { color: var(--ink); background: var(--paper); }
 .delete-date { width: 32px; height: 36px; }
@@ -83,11 +86,10 @@ input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 1
 .add-date input { width: 100%; }
 @media (max-width: 600px) {
   :root { --header-height: 74px; }
-  .topbar { padding-right: 18px; padding-left: 14px; gap: 8px; }
-  .topbar-left { gap: 4px; }
-  #dates-button { width: 32px; }
-  .topbar-right { gap: 5px; }
-  .status { font-size: 10px; max-width: 145px; line-height: 1.5; }
+  .topbar { padding-right: 22px; padding-left: 22px; gap: 8px; }
+  .topbar-right { flex-direction: column-reverse; align-items: flex-end; gap: 0; }
+  .status-button { padding: 4px 0; }
+  .status { font-size: 10px; max-width: 180px; line-height: 1.5; }
   #journal { width: calc(100% - 48px); margin-top: 42px; }
   .day-heading { font-size: 25px; margin-bottom: 22px; }
   .day-toggle { gap: 12px; }

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openDate } from './helpers';
 import * as A from '@automerge/automerge';
 import { createDay, editDay } from '../../src/domain/day';
 
@@ -105,8 +106,10 @@ test('opens the unchanged database from the former root-page application', async
     };
   }), history);
   await page.getByRole('link', { name: 'Open journal' }).click();
+  await openDate(page, '2020-01-01');
   await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toHaveText('Saved before the journal moved.');
   await page.reload();
   await expect(page.locator('[data-date="2020-01-01"] .day-heading time')).toHaveText('2020-01-01');
+  await openDate(page, '2020-01-01');
   await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toHaveText('Saved before the journal moved.');
 });

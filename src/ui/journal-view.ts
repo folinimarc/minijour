@@ -34,10 +34,10 @@ export class JournalView {
   render(): void {
     const dates = this.dates;
     for (const [date, section] of this.sections) section.element.hidden = !dates.includes(date);
-    dates.forEach((date, index) => {
+    dates.forEach(date => {
       const section = this.sections.get(date) ?? this.createSection(date);
       section.element.hidden = false;
-      const expanded = this.expanded.get(date) ?? index < 3;
+      const expanded = this.expanded.get(date) ?? false;
       section.toggle.setAttribute('aria-expanded', String(expanded));
       section.content.hidden = !expanded;
       section.element.classList.toggle('collapsed', !expanded);
@@ -62,6 +62,7 @@ export class JournalView {
     if (!this.journal.days.has(date) && !this.drafts.has(date)) this.drafts.set(date, createDay(date));
     this.activeDate = date;
     this.opened.add(date);
+    this.expanded.clear();
     this.expanded.set(date, true);
     this.render();
     const editor = this.editors.get(date)!;
