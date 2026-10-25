@@ -1,6 +1,6 @@
 import * as A from '@automerge/automerge';
 import { createDay, hasContent, isDate, localDate, type DayDoc } from '../domain/day';
-import type { Journal } from '../domain/journal';
+import type { ChangeOrigin, Journal } from '../domain/journal';
 import { DayEditor } from './editor';
 import { icon } from './icons';
 import type { PhotoUrls } from './photos';
@@ -46,15 +46,28 @@ export class JournalView {
     this.onDatesChange();
   }
 
-  receive(date: string): void {
+  receive(date: string, origin: ChangeOrigin = 'remote'): void {
     if (this.journal.days.has(date)) this.drafts.delete(date);
-    this.editors.get(date)?.receive(this.document(date));
-    const visible = hasContent(this.document(date)) || this.opened.has(date);
-    const section = this.sections.get(date);
-    const wasVisible = section ? !section.element.hidden : false;
-    // Ordinary keystrokes should not rebuild every date section or sidebar row.
-    if (visible !== wasVisible) this.render();
-    if (this.openingEditor && this.options.canFocus()) this.openingEditor.revealEnd();
+    const applied = () => {
+      const filled = hasContent(this.document(date));
+      // Local clearing keeps undo available. Incoming clearing removes a date
+      // even if this tab opened it earlier; today's writing surface stays.
+      if (origin === 'remote' && !filled && date !== localDate()) {
+        this.opened.delete(date);
+        this.expanded.delete(date);
+        if (this.activeDate === date) { this.openDate(localDate()); return; }
+      }
+      const visible = filled || this.opened.has(date);
+      const section = this.sections.get(date);
+      const wasVisible = section ? !section.element.hidden : false;
+      // Ordinary keystrokes should not rebuild every date section or sidebar row.
+      if (visible !== wasVisible) this.render();
+      this.revealOpening();
+    };
+    const editor = this.editors.get(date);
+    // Wait for IME composition before hiding its editor or moving focus.
+    if (editor) editor.receive(this.document(date), applied);
+    else applied();
   }
 
   openDate(date: string, followOpening = false): void {
@@ -143,7 +156,7 @@ export class JournalView {
         this.drafts.set(date, next);
         return;
       }
-      void this.journal.merge(date, A.save(next)).then(this.options.afterSave).catch(this.options.notify);
+      void this.journal.merge(date, A.save(next), 'local').then(this.options.afterSave).catch(this.options.notify);
     }, () => {
       this.activeDate = date;
       this.opened.add(date);

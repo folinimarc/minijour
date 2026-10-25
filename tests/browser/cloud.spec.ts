@@ -356,8 +356,6 @@ test('deletes an entry from the date drawer across devices while retaining photo
   const other = await fresh.newPage(); await openJournal(other); await connect(other);
   await openDate(other, '2020-02-29');
   await expect(other.locator('[data-date="2020-02-29"] .cm-content')).toContainText('A memory to delete.');
-  await other.reload();
-  await expect(other.locator('.cm-content')).toBeFocused();
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Delete entry for 2020-02-29' }).click();

@@ -57,7 +57,7 @@ function photoPreviews(urls: PhotoUrls) {
 export class DayEditor {
   readonly view: EditorView;
   private applyingExternal = false;
-  private deferredDoc?: DayDoc;
+  private deferredDoc?: { doc: DayDoc; onApplied?: () => void };
   private displayedDoc: DayDoc;
 
   constructor(parent: HTMLElement, doc: DayDoc, date: string, urls: PhotoUrls,
@@ -90,7 +90,7 @@ export class DayEditor {
                 if (this.deferredDoc !== undefined) {
                   const incoming = this.deferredDoc;
                   this.deferredDoc = undefined;
-                  this.receive(incoming);
+                  this.receive(incoming.doc, incoming.onApplied);
                 }
               }, 0);
             },
@@ -110,15 +110,15 @@ export class DayEditor {
 
   get doc(): DayDoc { return this.displayedDoc; }
 
-  receive(doc: DayDoc): void {
-    if (this.view.composing) { this.deferredDoc = doc; return; }
+  receive(doc: DayDoc, onApplied?: () => void): void {
+    if (this.view.composing) { this.deferredDoc = { doc, onApplied }; return; }
     // A newer edit may arrive after composition ends but before its queued
     // callback runs. Do not let that callback restore an older document.
     this.deferredDoc = undefined;
     this.displayedDoc = doc;
     const text = doc.text;
     const current = this.view.state.doc.toString();
-    if (current === text) return;
+    if (current === text) { onApplied?.(); return; }
     // Apply the smallest contiguous display patch so CodeMirror can map the
     // cursor. Automerge has already performed the actual data merge.
     let start = 0;
@@ -129,6 +129,7 @@ export class DayEditor {
     try {
       this.view.dispatch({ changes: { from: start, to: end, insert: text.slice(start, nextEnd) }, annotations: [externalChange.of(true), Transaction.addToHistory.of(false)] });
     } finally { this.applyingExternal = false; }
+    onApplied?.();
   }
 
   focusEnd(): void {

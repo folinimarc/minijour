@@ -96,3 +96,59 @@ test('goes to the current local date without adding a special date row', async (
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
   await expect(page.locator('.date-link')).toHaveText(['2026-10-26', TODAY, '2020-02-29']);
 });
+
+test('removes a previously opened, collapsed date when another tab deletes it', async ({ page, context }) => {
+  await openJournal(page);
+  await restoreDays(page, { '2020-02-29': 'An older memory.' });
+  await openDate(page, '2020-02-29');
+  await openDate(page, TODAY);
+  const removed = page.locator('[data-date="2020-02-29"]');
+  await expect(removed.locator('.day-toggle')).toHaveAttribute('aria-expanded', 'false');
+  const other = await context.newPage();
+  await openJournal(other);
+  await other.getByRole('button', { name: 'Dates', exact: true }).click();
+  other.once('dialog', dialog => dialog.accept());
+  await other.getByRole('button', { name: 'Delete entry for 2020-02-29' }).click();
+  await expect(removed).toBeHidden();
+  await page.getByRole('button', { name: 'Dates', exact: true }).click();
+  await expect(page.locator('.date-link')).toHaveText([TODAY]);
+  expect(await storedDates(page)).toEqual(['2020-02-29']);
+});
+
+for (const keepTyping of [false, true]) {
+  test(`defers a remote date deletion during composition${keepTyping ? ' and preserves new typing' : ''}`, async ({ page, context }) => {
+    const date = '2020-02-29';
+    await openJournal(page);
+    await openDate(page, date); await page.keyboard.insertText('Old memory.');
+    await expect(page.getByRole('status')).toHaveText('Saved on this device');
+    const other = await context.newPage(); await openJournal(other); await openDate(other, date);
+    const content = page.locator(`[data-date="${date}"] .cm-content`);
+    await content.focus(); await content.dispatchEvent('compositionstart');
+    await page.keyboard.insertText('Composing.');
+    await expect(other.locator(`[data-date="${date}"] .cm-content`)).toHaveText('Old memory.Composing.');
+    // Observe delivery so the assertions exercise an actual deferred update.
+    await page.evaluate(date => {
+      const received = new BroadcastChannel('minijour-v1');
+      received.onmessage = event => {
+        if (event.data.date !== date) return;
+        document.documentElement.dataset.testRemoteDate = date;
+        received.close();
+      };
+    }, date);
+    await other.getByRole('button', { name: 'Dates', exact: true }).click();
+    other.once('dialog', dialog => dialog.accept());
+    await other.getByRole('button', { name: `Delete entry for ${date}` }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-test-remote-date', date);
+    await expect(content).toBeVisible();
+    await expect(content).toHaveText('Old memory.Composing.');
+    if (keepTyping) await page.keyboard.insertText('New words.');
+    await content.dispatchEvent('compositionend');
+    if (keepTyping) {
+      await expect(content).toHaveText('New words.');
+      await expect(other.locator(`[data-date="${date}"] .cm-content`)).toHaveText('New words.');
+    } else {
+      await expect(page.locator(`[data-date="${date}"]`)).toBeHidden();
+      await expect(page.locator(`[data-date="${TODAY}"] .cm-content`)).toBeFocused();
+    }
+  });
+}

@@ -14,7 +14,7 @@ Entries appear newest first. Only today starts expanded; select a date heading t
 
 Choose **Dates** beside **Settings** to browse all dates. **Go to today** and **Add date** sit below the title. All dates appear in newest-first order. Selecting a date expands its entry, collapses the others, and moves the cursor there. **Add date** shows a picker for any past or future date; an existing date opens its current entry. Opening the app always returns to today. Daily rollover does not interrupt a past or future date you deliberately opened.
 
-The bin beside a date deletes its current text after confirmation. Photos remain in storage until you clean them up separately. Today's empty writing surface remains available. Deleting or clearing an entry retains its Automerge history for sync, rather than erasing old checkpoints or backups. Concurrent edits can still merge into that date. Cleared dates opened in this session keep their heading and editor for undo; after reloading, only dates with content and today's draft appear.
+The bin beside a date deletes its current text after confirmation. Photos remain in storage until you clean them up separately. Deleting or clearing an entry retains its Automerge history for sync, rather than erasing old checkpoints or backups. Concurrent edits can still merge into that date. Clearing text locally keeps its heading and editor for undo. When another device clears or deletes an entry, its heading and sidebar link disappear without reloading, even if you opened that date earlier. If it was your active date, writing returns to today. Today’s empty writing surface remains available.
 
 ## Install
 

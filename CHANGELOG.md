@@ -4,7 +4,9 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+### Fixed
 
+- Remove headings and sidebar links for dates cleared on another device, including previously opened dates. Keep local undo, today’s draft, and unfinished keyboard input intact.
 
 ## 0.2.0 - 2026-10-25
 

@@ -2,7 +2,8 @@ import * as A from '@automerge/automerge';
 import { createDay, editDay, heads, isDate, loadDay, mergeDays, type DayDoc } from './day';
 import type { LocalStore } from '../storage/local';
 
-export type JournalEvent = { date?: string; photos?: boolean; error?: Error };
+export type ChangeOrigin = 'local' | 'remote';
+export type JournalEvent = { date?: string; origin?: ChangeOrigin; photos?: boolean; error?: Error };
 
 /** The small application model: optimistic editing, durable saves, and events. */
 export class Journal {
@@ -40,19 +41,19 @@ export class Journal {
     this.listeners.forEach(listener => listener(event));
   }
 
-  private accept(date: string, incoming: DayDoc): boolean {
+  private accept(date: string, incoming: DayDoc, origin: ChangeOrigin = 'remote'): boolean {
     const previous = this.days.get(date);
     const next = previous ? mergeDays(previous, incoming) : incoming;
     if (previous && heads(previous) === heads(next)) return false;
     this.days.set(date, next);
-    this.emit({ date });
+    this.emit({ date, origin });
     return true;
   }
 
   async ensureDay(date: string): Promise<void> {
     if (this.days.has(date)) return;
     this.days.set(date, createDay(date));
-    this.emit({ date });
+    this.emit({ date, origin: 'local' });
     await this.persist(date);
   }
 
@@ -60,13 +61,13 @@ export class Journal {
     const doc = this.days.get(date);
     if (!doc || doc.text === text) return;
     this.days.set(date, editDay(doc, text));
-    this.emit({ date });
+    this.emit({ date, origin: 'local' });
     await this.persist(date);
   }
 
-  async merge(date: string, bytes: Uint8Array): Promise<void> {
+  async merge(date: string, bytes: Uint8Array, origin: ChangeOrigin = 'remote'): Promise<void> {
     if (!isDate(date)) throw new Error('Invalid journal date.');
-    if (this.accept(date, loadDay(bytes))) await this.persist(date);
+    if (this.accept(date, loadDay(bytes), origin)) await this.persist(date);
   }
 
   async flush(): Promise<void> {

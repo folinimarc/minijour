@@ -111,7 +111,7 @@ async function start(): Promise<void> {
 
   journal.subscribe(event => {
     if (event.date) {
-      view.receive(event.date);
+      view.receive(event.date, event.origin);
       scheduleSync();
     } else if (event.photos) {
       urls.clear();
