@@ -4,7 +4,11 @@
 html { scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top) + 16px); }
 .topbar { position: sticky; top: 0; z-index: 10; height: calc(var(--header-height) + env(safe-area-inset-top)); max-width: 1160px; padding: env(safe-area-inset-top) 44px 0; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--paper); border-bottom: 1px solid var(--line); }
 .topbar-right { display: flex; align-items: center; gap: 16px; }
+.status-button { padding: 8px 0; border: 0; background: transparent; color: inherit; text-align: left; }
 .status { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); letter-spacing: .1px; }
+.cloud-warning { display: inline-flex; color: #9b794c; }
+.cloud-warning svg { width: 13px; height: 13px; }
+.needs-cloud .status-dot { display: none; }
 .status-dot { width: 5px; height: 5px; background: #7b9472; border-radius: 50%; flex-shrink: 0; }
 .status.has-error .status-dot { background: #b27743; }
 .status.is-busy .status-dot { animation: breathe 1s infinite alternate; }

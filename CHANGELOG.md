@@ -11,6 +11,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Changed
 
+- Simplify settings and show a clickable warning when cloud storage is not connected.
 - Use the journal logo as the favicon on both pages.
 - Use the journal's book logo and wordmark styling on the landing page as well.
 - Shorten the landing page, simplify its storage summary, and remove promotional taglines.

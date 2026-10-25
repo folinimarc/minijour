@@ -9,7 +9,7 @@ test('opens ready to write, saves Markdown, and restores it without another head
   await openJournal(page);
   await expect(page.locator('.cm-content')).toBeFocused();
   await page.keyboard.insertText('A quiet morning. 🦊\n\n**Something to remember.**');
-  await expect(page.getByRole('status')).toContainText('Saved on this device');
+  await expect(page.getByRole('status')).toContainText('Cloud storage not configured');
   await page.reload();
   await expect(page.locator('.cm-content')).toContainText('A quiet morning. 🦊');
   await expect(page.locator('.day-heading')).toHaveCount(1);
@@ -29,7 +29,7 @@ test('inserts a device photo at the cursor and restores its preview', async ({ p
   const text = await page.locator('.cm-content').innerText();
   expect(text.indexOf('Before.')).toBeLessThan(text.indexOf('![Photo]'));
   expect(text.indexOf('![Photo]')).toBeLessThan(text.indexOf('After.'));
-  await expect(page.getByRole('status')).toContainText('Saved on this device');
+  await expect(page.getByRole('status')).toContainText('Cloud storage not configured');
   await page.reload();
   await expect(page.locator('.photo-preview img')).toBeVisible();
 });
@@ -186,7 +186,7 @@ test('keeps a reviewed photo when another tab adds a reference before confirmati
   await expect(page.locator('#photo-cleanup-summary')).toContainText('1 unused photo');
   const other = await context.newPage(); await openJournal(other);
   await replaceEntry(other, `Keep this reference: ![Photo](photos/${name})`);
-  await expect(other.getByRole('status')).toHaveText('Saved on this device');
+  await expect(other.getByRole('status')).toHaveText('Cloud storage not configured');
   await page.getByRole('button', { name: 'Permanently delete photos' }).click();
   await expect(page.getByRole('alert')).toContainText('No photos removed');
   expect(await storedPhotos(page)).toEqual([name]);
@@ -202,7 +202,7 @@ test('shows local journaling without provider choices or setup controls when non
   });
   await openJournal(page);
   await page.keyboard.insertText('My local journal.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Cloud storage not configured');
   // Browser-entered keys and older tokens must not silently enable a provider.
   await page.evaluate(() => new Promise<void>((resolve, reject) => {
     const open = indexedDB.open('minijour-v1');
@@ -219,8 +219,9 @@ test('shows local journaling without provider choices or setup controls when non
   await page.reload();
   await expect(page.locator('.cm-content')).toContainText('My local journal.');
   await page.getByRole('button', { name: 'Settings and backup' }).click();
-  await expect(page.getByRole('heading', { name: 'Cloud sync', exact: true })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Cloud sync', exact: true })).toBeVisible();
   await expect(page.locator('#cloud-providers button')).toHaveCount(0);
+  await expect(page.locator('#connection-description')).toContainText('Cloud sync is unavailable on this website');
   await expect(page.locator('#app-key, #redirect-uri, #cloud-section details')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Download backup' })).toBeEnabled();
   expect(cloudRequests).toEqual([]);

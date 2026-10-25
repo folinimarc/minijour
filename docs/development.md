@@ -39,6 +39,7 @@ src/
     vault.ts          Password wrapping, encryption, and encrypted file adapter
   storage/
     local.ts          IndexedDB access, including safe saves from multiple tabs
+    persistence.ts    Best-effort browser storage protection after a save
     backup.ts         Portable ZIP export and text history restore
     photo-cleanup.ts  Candidate photo IDs and sizes for explicit review
   sync/
@@ -51,7 +52,6 @@ src/
     icons.ts          Inline SVG icons shared by the landing page and journal
     photo-cleanup.ts  Review, confirmation, and required cloud sync
     cloud-settings.ts Connection, password unlock, and legacy import controls
-    storage-settings.ts Persistence status, one-time advice, and explicit retry
     shell.ts          Static application markup and element references
     editor.ts         CodeMirror editor and photo previews
     photos.ts         Image resizing and local display URLs
@@ -88,7 +88,7 @@ Once an entry has been saved, clearing it still persists and syncs its Automerge
 
 The top bar is sticky. On opening, the editor explicitly scrolls its final position into view; delayed photo loads and viewport resizing can repeat that reveal until the first user interaction. Browser scroll restoration is disabled on the journal page. After interaction, incoming sync preserves the person's position.
 
-`ui/storage-settings.ts` checks persistence separately from saving. It requests protection after the first successful edit, records the attempt and whether advice was shown in local preferences, and then leaves retries to the settings button. A refusal or unsupported API does not disable IndexedDB saves. Advice never replaces an existing notice or journal save error. These preferences stay on the device and are excluded from backups.
+`storage/persistence.ts` requests browser storage protection after the first successful edit. It records the attempt in local preferences and does not repeat automatic requests. A refusal or unsupported API does not disable IndexedDB saves. The clickable header status warns when no cloud account is connected; settings explain browser-data loss and offer configured providers. Storage protection never prevents deliberate clearing of browser data.
 
 Per-day documents keep transfers smaller and make a date heading unique without trying to merge independently inserted headings in freeform text. Devices construct the same immutable creation change for a given date, then switch to fresh actor IDs for actual edits. This shared starting point matters: independently creating two nested text objects would cause property conflicts rather than collaborative text edits. The fixed creation actor must never be used for subsequent typing.
 
@@ -98,7 +98,7 @@ IndexedDB saves merge inside a read/write transaction. That protects against two
 
 ### Cloud providers
 
-`sync/providers.ts` is the only place that selects providers from build configuration. It returns configured `CloudProvider` instances; `ui/cloud-settings.ts` renders their connection buttons and shares the password, encryption, lock, disconnect, and legacy-import controls. An empty registry hides cloud settings. Neither the editor nor the sync engine imports a provider adapter.
+`sync/providers.ts` is the only place that selects providers from build configuration. It returns configured `CloudProvider` instances; `ui/cloud-settings.ts` renders their connection buttons and shares the password, encryption, lock, disconnect, and legacy-import controls. An empty registry shows local-storage guidance without connection buttons. Neither the editor nor the sync engine imports a provider adapter.
 
 A `CloudProvider` has a stable ID and display name, starts authorization, finishes its callback, and opens a saved connection. Its `CloudSession` provides `VaultStorage`, disconnect, and optionally read-only legacy files. The shared OAuth dispatcher remembers the selected provider in the current tab, invokes only that provider on return, and clears callback parameters. Each adapter validates its own state and authorization response.
 

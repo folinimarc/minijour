@@ -6,7 +6,7 @@ export function mountShell() {
     <header class="topbar">
       <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
       <div class="topbar-right">
-        <span id="status" class="status" role="status"><span class="status-dot"></span><span id="status-text">Opening your journal…</span></span>
+        <button id="status-button" class="status-button" aria-label="Cloud storage and sync settings"><span id="status" class="status" role="status"><span id="cloud-warning" class="cloud-warning" hidden>${icon('warning')}</span><span class="status-dot"></span><span id="status-text">Opening your journal…</span></span></button>
         <button id="settings-button" class="icon-button" aria-label="Settings and backup" title="Settings and backup">${icon('settings')}</button>
       </div>
     </header>
@@ -25,11 +25,10 @@ export function mountShell() {
     <button id="update-button" class="update-button" hidden>Update ready · reload</button>
     <dialog id="settings-dialog" aria-labelledby="settings-title">
       <div class="dialog-header"><h1 id="settings-title">Settings</h1><button id="close-settings" class="icon-button" aria-label="Close settings">${icon('close')}</button></div>
-      <section id="cloud-section" class="settings-section" hidden>
+      <section id="cloud-section" class="settings-section">
         <h2>${icon('cloud')}Cloud sync</h2>
-        <p id="connection-description">Your journal saves on this device. Connect your own cloud account for encrypted sync.</p>
+        <p id="connection-description">Your journal saves on this device. Clearing browser data can remove it. Connect your own cloud account for encrypted sync.</p>
         <div id="cloud-providers" class="button-row" hidden></div>
-        <p id="cloud-account-help" class="help">Local entries combine with your journal in that account. This browser’s journal stays linked to the same provider and account after disconnecting.</p>
         <div id="cloud-connected" class="button-row" hidden>
           <button id="sync-button" class="primary-button">Sync now</button>
           <button id="lock-button" class="secondary-button">Lock cloud</button>
@@ -50,22 +49,16 @@ export function mountShell() {
           <p id="legacy-cloud-description" class="help"></p>
           <button id="import-legacy-button" class="secondary-button">Import older cloud files</button>
         </div>
-        <p class="help">When connected, text, editing history, and photos are encrypted on this device before upload. Your cloud provider can still see file sizes and upload times. Sync runs while the app is open and cloud access is unlocked.</p>
+        <p class="help">Text, editing history, and photos are encrypted before upload and shared with devices connected to the same account. Sync runs while minijour is open and cloud access is unlocked.</p>
       </section>
       <section class="settings-section">
         <h2>Download and restore</h2>
-        <p>Download your Markdown, referenced photos, and text editing history as an unencrypted ZIP. Restoring combines entries and keeps permanent photo deletions.</p>
+        <p>Download your journal and photos as an unencrypted ZIP. Restore a backup to combine its entries with this journal.</p>
         <div class="button-row"><button id="export-button" class="secondary-button">Download backup</button><button id="restore-button" class="text-button">Restore backup</button></div>
-      </section>
-      <section class="settings-section settings-small" aria-labelledby="storage-title">
-        <h2 id="storage-title">Device storage</h2>
-        <p id="storage-status" aria-live="polite">Checking storage protection…</p>
-        <p id="storage-help" class="help"></p>
-        <button id="request-storage" class="secondary-button" hidden>Request persistent storage</button>
       </section>
       <section class="settings-section settings-small">
         <h2>Photo storage</h2>
-        <p>Removing a photo link keeps its file for undo. You can permanently remove files that no current entry uses.</p>
+        <p>Removing a photo link does not remove the photo file. Clean up files that no entry uses below.</p>
         <button id="review-photos-button" class="secondary-button">Clean up unused photos</button>
         <div id="photo-cleanup-review" hidden>
           <p id="photo-cleanup-summary"></p>
@@ -87,7 +80,6 @@ export function mountShell() {
         <h2>Install</h2>
         <p>Install from your browser’s menu, or choose <strong>Add to Home Screen</strong> from the Share menu. After the first visit and offline installation, you can write without a connection.</p>
         <button id="install-button" class="secondary-button" hidden>Install minijour</button>
-        <p class="help">Dates follow your device’s local time. Day headings are automatic. Without cloud sync or an exported backup, clearing browser data removes your journal.</p>
       </section>
       <section class="settings-section settings-small">
         <h2>About minijour <span class="app-version">${__APP_VERSION__}</span></h2>
@@ -98,6 +90,7 @@ export function mountShell() {
   const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   return {
     journal: get<HTMLElement>('journal'), status: get<HTMLSpanElement>('status'), statusText: get<HTMLSpanElement>('status-text'),
+    statusButton: get<HTMLButtonElement>('status-button'), cloudWarning: get<HTMLSpanElement>('cloud-warning'),
     settingsButton: get<HTMLButtonElement>('settings-button'), dialog: get<HTMLDialogElement>('settings-dialog'),
     closeSettings: get<HTMLButtonElement>('close-settings'), photoButton: get<HTMLButtonElement>('photo-button'),
     photoMenu: get<HTMLDivElement>('photo-menu'), cameraButton: get<HTMLButtonElement>('camera-button'),
@@ -107,14 +100,11 @@ export function mountShell() {
     disconnect: get<HTMLButtonElement>('disconnect-button'),
     sync: get<HTMLButtonElement>('sync-button'), export: get<HTMLButtonElement>('export-button'),
     restore: get<HTMLButtonElement>('restore-button'),
-    storageStatus: get<HTMLParagraphElement>('storage-status'), storageHelp: get<HTMLParagraphElement>('storage-help'),
-    requestStorage: get<HTMLButtonElement>('request-storage'),
     dateForm: get<HTMLFormElement>('date-form'), entryDate: get<HTMLInputElement>('entry-date'),
     cloudSection: get<HTMLElement>('cloud-section'), providerList: get<HTMLDivElement>('cloud-providers'),
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),
     photoCleanupSummary: get<HTMLParagraphElement>('photo-cleanup-summary'),
     confirmPhotoCleanup: get<HTMLButtonElement>('confirm-photo-cleanup'), cancelPhotoCleanup: get<HTMLButtonElement>('cancel-photo-cleanup'),
-    accountHelp: get<HTMLParagraphElement>('cloud-account-help'),
     vaultForm: get<HTMLFormElement>('vault-form'), vaultDescription: get<HTMLParagraphElement>('vault-description'),
     password: get<HTMLInputElement>('cloud-password'), passwordConfirm: get<HTMLInputElement>('cloud-password-confirm'),
     confirmation: get<HTMLDivElement>('password-confirmation'), remember: get<HTMLInputElement>('remember-cloud'),

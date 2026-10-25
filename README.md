@@ -36,7 +36,7 @@ Website operators configure providers once, before building. Visitors see only c
 | --- | --- | --- |
 | Dropbox | `VITE_DROPBOX_APP_KEY` | [Register an app and its redirect URI](docs/deployment.md#dropbox) |
 
-Copy `.env.example` to `.env` for local builds, or set the variable in CI. On GitHub Pages, use an Actions repository variable. Rebuild and deploy after changing configuration. Leaving the key empty produces a local-only app with ZIP backups and no cloud controls.
+Copy `.env.example` to `.env` for local builds, or set the variable in CI. On GitHub Pages, use an Actions repository variable. Rebuild and deploy after changing configuration. Leaving the key empty produces a local-only app with ZIP backups and no cloud connection buttons.
 
 Dropbox is the only implemented provider. The [developer guide](docs/development.md#add-a-cloud-provider) explains how to add another without changing the editor, encryption, or sync engine.
 

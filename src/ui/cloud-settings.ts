@@ -12,6 +12,7 @@ export async function setupCloudSettings(
   options: {
     busy: () => boolean; activity: (value: boolean) => void;
     change: (engine?: SyncEngine, providerName?: string) => void;
+    connection: (connected: boolean) => void;
     sync: () => Promise<void>; notify: (error: unknown) => void;
   },
 ): Promise<void> {
@@ -29,9 +30,8 @@ export async function setupCloudSettings(
   let inspected = false;
   const setWorking = (value: boolean) => { working = value; options.activity(value); };
   const show = () => {
-    ui.cloudSection.hidden = providers.length === 0;
+    options.connection(!!session);
     ui.providerList.hidden = !!session;
-    ui.accountHelp.hidden = !!session;
     for (const [entry, button] of buttons) button.disabled = working || !!owner && owner.providerId !== entry.id;
     ui.connected.hidden = !session;
     ui.vaultForm.hidden = !session || unlocked || !inspected;
@@ -42,8 +42,9 @@ export async function setupCloudSettings(
     ui.connectionDescription.textContent = unlocked
       ? `Connected to ${providerName}. Your journal syncs encrypted.`
       : session ? `${providerName} is connected. Unlock cloud access to sync. You can keep writing locally.`
-      : owner ? 'This journal is linked to its original cloud account. Reconnect it to resume sync.'
-      : 'Your journal saves on this device. Connect your own cloud account for encrypted sync.';
+      : providers.length === 0 ? 'Your journal saves on this device. Clearing browser data can remove it. Cloud sync is unavailable on this website; download a backup to keep a copy.'
+      : owner ? 'Your journal saves on this device. Clearing browser data can remove it. Reconnect its original cloud account to resume encrypted sync.'
+      : 'Your journal saves on this device. Clearing browser data can remove it. Connect your own cloud account for encrypted sync.';
     ui.confirmation.hidden = !!header;
     ui.password.autocomplete = header ? 'current-password' : 'new-password';
     ui.passwordConfirm.required = !header;

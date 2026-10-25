@@ -91,7 +91,7 @@ test('blocks a different Dropbox account without sending it any journal data', a
   await expect(page.locator('.cm-content')).toContainText('Keep this journal');
   expect(mock.apiCalls).toBe(previousCalls);
   await page.reload();
-  await expect(page.getByRole('status')).toContainText('Saved on this device');
+  await expect(page.getByRole('status')).toContainText('Cloud storage not configured');
   await expect(page.locator('.cm-content')).toContainText('Keep this journal');
   mock.accountId = 'test-account';
   await connect(page);
@@ -113,7 +113,7 @@ test('keeps cloud locked after reload unless remembering was requested, and neve
   await page.reload();
   await expect(page.locator('.cm-content')).toContainText('Private memory.');
   await page.keyboard.press('End'); await page.keyboard.insertText(' Local writing still works.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Cloud storage locked');
   expect(mock.revision).toBe(writes);
   await page.getByRole('button', { name: 'Settings and backup' }).click();
   await expect(page.getByRole('button', { name: 'Unlock cloud', exact: true })).toBeVisible();
@@ -144,7 +144,7 @@ test('requires matching passwords on setup and keeps local writing available aft
   await page.reload();
   await expect(page.locator('.cm-content')).toBeFocused();
   await page.keyboard.insertText('Writing while cloud access is unavailable.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Cloud storage locked');
   await page.getByRole('button', { name: 'Add a photo', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Choose from device' })).toBeVisible();
   await page.getByRole('button', { name: 'Settings and backup' }).click();

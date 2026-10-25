@@ -9,7 +9,7 @@ import { exportJournal, importJournal } from './storage/backup';
 import { configuredProviders, finishCloudConnection } from './sync/providers';
 import { setupCloudSettings } from './ui/cloud-settings';
 import { setupPhotoCleanup } from './ui/photo-cleanup';
-import { setupStorageSettings } from './ui/storage-settings';
+import { protectStorage } from './storage/persistence';
 import { SyncEngine } from './sync/engine';
 import { DayEditor } from './ui/editor';
 import { PhotoUrls, preparePhoto } from './ui/photos';
@@ -39,6 +39,7 @@ async function start(): Promise<void> {
   let syncing = false;
   let cleaning = false;
   let cloudWorking = false;
+  let cloudConnected = false;
   let syncError = false;
   let lastSync: Date | undefined;
   let dirty = true;
@@ -51,21 +52,25 @@ async function start(): Promise<void> {
   let openingEditor: DayEditor | undefined;
 
   await journal.load();
-  const storage = await setupStorageSettings(ui, journal, notify);
+  const afterSave = protectStorage(local);
   let justConnected = false;
   try { justConnected = await finishCloudConnection(local, providers); } catch (error) { notify(error); }
 
   function updateStatus(): void {
     ui.status.classList.toggle('has-error', !!journal.saveError || syncError);
     ui.status.classList.toggle('is-busy', journal.pending > 0 || syncing || cleaning);
+    ui.status.classList.toggle('needs-cloud', !cloudConnected);
+    ui.cloudWarning.hidden = cloudConnected;
     ui.statusText.textContent = journal.saveError ? 'Could not save on this device'
       : journal.pending ? 'Saving…'
-      : !navigator.onLine ? 'Saved on device · offline'
       : cleaning ? 'Saved on device · updating photos…'
       : syncing ? 'Saved on device · syncing…'
       : syncError ? 'Saved on device · sync needs attention'
-      : engine && lastSync && !dirty ? `Saved to ${cloudName}`
-      : 'Saved on this device';
+      : !cloudConnected ? `Cloud storage not configured${navigator.onLine ? '' : ' · offline'}`
+      : !navigator.onLine ? 'Saved on device · offline'
+      : !engine ? 'Cloud storage locked'
+      : lastSync && !dirty ? `Saved to ${cloudName}`
+      : 'Saved on device · waiting to sync';
     ui.sync.disabled = syncing || cleaning;
     ui.sync.textContent = syncing ? 'Syncing…' : 'Sync now';
   }
@@ -148,7 +153,7 @@ async function start(): Promise<void> {
         updateDayVisibility(date);
         return;
       }
-      void journal.merge(date, A.save(next)).then(storage.afterEdit).catch(notify);
+      void journal.merge(date, A.save(next)).then(afterSave).catch(notify);
     }, () => {
       activeDate = date;
       for (const day of editors.keys()) updateDayVisibility(day);
@@ -211,8 +216,9 @@ async function start(): Promise<void> {
 
   ui.settingsButton.onclick = () => {
     closePhotoMenu(); ui.entryDate.value = activeDate;
-    ui.dialog.append(ui.notice); ui.dialog.showModal(); void storage.refresh();
+    ui.dialog.append(ui.notice); ui.dialog.showModal();
   };
+  ui.statusButton.onclick = () => ui.settingsButton.click();
   const dateSettings = ui.dateForm.closest<HTMLDetailsElement>('details')!;
   dateSettings.ontoggle = () => { if (dateSettings.open) dateSettings.scrollIntoView({ block: 'nearest' }); };
   ui.dateForm.onsubmit = event => {
@@ -345,6 +351,7 @@ async function start(): Promise<void> {
       engine = next; cloudName = name; syncError = false; lastSync = undefined; dirty = true;
       updateStatus();
     },
+    connection: value => { cloudConnected = value; updateStatus(); },
     sync, notify,
   });
   if (justConnected) ui.settingsButton.click();

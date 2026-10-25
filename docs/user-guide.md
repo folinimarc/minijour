@@ -58,7 +58,7 @@ There is no analytics, advertising, or external font loading. You trust the code
 
 Without cloud sync or an exported backup, clearing browser data or losing the device loses the journal. The app requests persistent storage after your first successful edit. Browsers may decline this automatically or ask for permission. A declined request does not stop saving, but the browser may clear local data to free space.
 
-If protection is not granted, a dismissible message appears once on this device. **… → Device storage** keeps the status available and offers **Request persistent storage** when supported. After a declined request, automatic requests stop; you can retry from settings. Even protected storage is removed when you clear browser data, so keep backups. If a local save actually fails, the app shows a save error; pending edits remain in memory, so download a backup before closing.
+The browser may grant or decline protection; writing still saves either way. The header shows **Cloud storage not configured** until you connect a cloud account. Select it to open settings and connect, or download a backup. Clearing browser data removes even protected storage. If a local save fails, the app shows a save error; pending edits remain in memory, so download a backup before closing.
 
 ## Clean up unused photos
 
