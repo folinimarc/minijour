@@ -49,8 +49,10 @@ export function editDay(doc: DayDoc, text: string): DayDoc {
   return A.change(doc, draft => A.updateText(draft, ['text'], text));
 }
 
+export function hasContent(day: Day): boolean { return day.text.trim().length > 0; }
+
 export function markdown(days: ReadonlyMap<string, DayDoc>): string {
-  return [...days].sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, doc]) => `# ${date}\n\n${doc.text.trimEnd()}`)
-    .join('\n\n') + '\n';
+  const entries = [...days].filter(([, doc]) => hasContent(doc)).sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, doc]) => `# ${date}\n\n${doc.text.trimEnd()}`);
+  return entries.length ? entries.join('\n\n') + '\n' : '';
 }

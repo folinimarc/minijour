@@ -68,6 +68,12 @@ export function mountShell() {
         <p>Download your Markdown, referenced photos, and text editing history as an unencrypted ZIP. Restoring combines entries and keeps permanent photo deletions.</p>
         <div class="button-row"><button id="export-button" class="secondary-button">Download backup</button><button id="restore-button" class="text-button">Restore backup</button></div>
       </section>
+      <section class="settings-section settings-small" aria-labelledby="storage-title">
+        <h2 id="storage-title">Device storage</h2>
+        <p id="storage-status" aria-live="polite">Checking storage protection…</p>
+        <p id="storage-help" class="help"></p>
+        <button id="request-storage" class="secondary-button" hidden>Request persistent storage</button>
+      </section>
       <section class="settings-section settings-small">
         <h2>Photo storage</h2>
         <p>Removing a photo link keeps its file for undo. You can permanently remove files that no current entry uses.</p>
@@ -103,6 +109,8 @@ export function mountShell() {
     disconnect: get<HTMLButtonElement>('disconnect-button'),
     sync: get<HTMLButtonElement>('sync-button'), export: get<HTMLButtonElement>('export-button'),
     restore: get<HTMLButtonElement>('restore-button'),
+    storageStatus: get<HTMLParagraphElement>('storage-status'), storageHelp: get<HTMLParagraphElement>('storage-help'),
+    requestStorage: get<HTMLButtonElement>('request-storage'),
     cloudSection: get<HTMLElement>('cloud-section'), providerList: get<HTMLDivElement>('cloud-providers'),
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),
     photoCleanupSummary: get<HTMLParagraphElement>('photo-cleanup-summary'),

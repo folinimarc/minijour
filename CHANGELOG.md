@@ -4,6 +4,15 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+### Added
+
+- Device storage protection status, one-time advice when protection is unavailable, and an explicit request button in settings.
+
+### Changed
+
+- Keep the journal header visible while scrolling and open at the end of today's entry.
+- Hide blank dates other than today and omit empty dates from Markdown exports, while preserving editing history in storage, sync, and backups.
+
 ## 0.1.0 - 2026-10-25
 
 ### Added
@@ -37,5 +46,3 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 - Block connecting a local journal to another cloud provider, account, or app, including after disconnecting, to prevent accidental cross-account uploads.
 - Prevent a pending unlock in another tab from restoring a remembered encryption key after Dropbox disconnects.
-
-No release has been published yet. The first intended version is 0.1.0.

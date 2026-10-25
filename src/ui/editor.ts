@@ -61,7 +61,7 @@ export class DayEditor {
   private displayedDoc: DayDoc;
 
   constructor(parent: HTMLElement, doc: DayDoc, date: string, urls: PhotoUrls,
-    onEdit: (doc: DayDoc) => void, onFocus: (editor: DayEditor) => void) {
+    onEdit: (doc: DayDoc) => void, onFocus: (editor: DayEditor) => void, onBlur: () => void) {
     this.displayedDoc = doc;
     this.view = new EditorView({
       parent,
@@ -70,6 +70,7 @@ export class DayEditor {
         extensions: [
           markdown(), history(), keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.lineWrapping,
+          EditorView.scrollMargins.of(() => ({ top: document.querySelector('.topbar')!.getBoundingClientRect().height, bottom: 24 })),
           placeholder('Start writing…'),
           EditorView.contentAttributes.of({ 'aria-label': `Journal for ${date}`, spellcheck: 'true', autocapitalize: 'sentences', autocorrect: 'on' }),
           syntaxHighlighting(HighlightStyle.define([
@@ -83,6 +84,7 @@ export class DayEditor {
           photoPreviews(urls),
           EditorView.domEventHandlers({
             focus: () => { onFocus(this); },
+            blur: onBlur,
             compositionend: () => {
               // Never disturb Android keyboard composition with incoming edits.
               setTimeout(() => {
@@ -131,8 +133,12 @@ export class DayEditor {
   }
 
   focusEnd(): void {
-    this.view.dispatch({ selection: { anchor: this.view.state.doc.length }, scrollIntoView: true });
+    this.view.dispatch({ selection: { anchor: this.view.state.doc.length } });
     this.view.focus();
+    this.revealEnd();
+  }
+  revealEnd(): void {
+    this.view.dispatch({ effects: EditorView.scrollIntoView(this.view.state.doc.length, { y: 'end', yMargin: 24 }) });
   }
   refreshPhotos(): void { this.view.dispatch({ effects: refreshPhotos.of() }); }
   destroy(): void { this.view.destroy(); }

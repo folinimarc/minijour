@@ -2,13 +2,14 @@
 import * as A from '@automerge/automerge';
 import automergeWasm from '@automerge/automerge/automerge.wasm?url';
 import { registerSW } from 'virtual:pwa-register';
-import { localDate } from './domain/day';
+import { hasContent, localDate } from './domain/day';
 import { Journal } from './domain/journal';
 import { LocalStore } from './storage/local';
 import { exportJournal, importJournal } from './storage/backup';
 import { configuredProviders, finishCloudConnection } from './sync/providers';
 import { setupCloudSettings } from './ui/cloud-settings';
 import { setupPhotoCleanup } from './ui/photo-cleanup';
+import { setupStorageSettings } from './ui/storage-settings';
 import { SyncEngine } from './sync/engine';
 import { DayEditor } from './ui/editor';
 import { PhotoUrls, preparePhoto } from './ui/photos';
@@ -16,6 +17,8 @@ import { mountShell } from './ui/shell';
 import './style.css';
 
 const ui = mountShell();
+// The editor owns its opening position, including reloads and PWA launches.
+history.scrollRestoration = 'manual';
 
 function notify(error: unknown): void {
   ui.noticeText.textContent = error instanceof Error ? error.message : String(error);
@@ -42,9 +45,10 @@ async function start(): Promise<void> {
   let syncTimer: ReturnType<typeof setTimeout> | undefined;
   let nextDay: ReturnType<typeof setTimeout>;
   let photoTarget: { date: string; anchor: A.Cursor; head: A.Cursor } | undefined;
-  let requestPersistent = false;
+  let openingEditor: DayEditor | undefined;
 
   await journal.load();
+  const storage = await setupStorageSettings(ui, journal, notify);
   let justConnected = false;
   try { justConnected = await finishCloudConnection(local, providers); } catch (error) { notify(error); }
 
@@ -96,10 +100,24 @@ async function start(): Promise<void> {
     syncTimer = setTimeout(() => { void sync(); }, 1500);
   }
 
+  function updateDayVisibility(date: string): void {
+    const editor = editors.get(date);
+    if (!editor) return;
+    const section = editor.view.dom.closest<HTMLElement>('.day')!;
+    // Keep a just-cleared editor available for undo until focus leaves it.
+    section.hidden = date !== localDate() && !hasContent(journal.days.get(date)!) && !editor.view.hasFocus;
+    if (section.hidden && activeDate === date) activeDate = localDate();
+  }
+
   function renderDay(date: string): void {
     const doc = journal.days.get(date)!;
     const existing = editors.get(date);
-    if (existing) { existing.receive(doc); return; }
+    if (existing) {
+      existing.receive(doc);
+      updateDayVisibility(date);
+      if (openingEditor === existing && !ui.dialog.open) existing.focusEnd();
+      return;
+    }
     const section = document.createElement('section');
     section.className = 'day';
     section.dataset.date = date;
@@ -119,13 +137,11 @@ async function start(): Promise<void> {
     const following = [...ui.journal.children].find(child => (child as HTMLElement).dataset.date! > date);
     ui.journal.insertBefore(section, following ?? null);
     const editor = new DayEditor(content, doc, date, urls, next => {
-      void journal.merge(date, A.save(next)).catch(notify);
-      if (!requestPersistent) {
-        requestPersistent = true;
-        void navigator.storage?.persist?.().catch(() => {});
-      }
-    }, () => { activeDate = date; });
+      openingEditor = undefined;
+      void journal.merge(date, A.save(next)).then(storage.afterEdit).catch(notify);
+    }, () => { activeDate = date; }, () => updateDayVisibility(date));
     editors.set(date, editor);
+    updateDayVisibility(date);
   }
 
   journal.subscribe(event => {
@@ -146,9 +162,13 @@ async function start(): Promise<void> {
     const date = localDate();
     const isNew = !journal.days.has(date);
     await journal.ensureDay(date);
+    for (const day of editors.keys()) updateDayVisibility(day);
     if (isNew || focus) {
       activeDate = date;
-      if (!ui.dialog.open) editors.get(date)?.focusEnd();
+      if (!ui.dialog.open) {
+        openingEditor = editors.get(date);
+        openingEditor?.focusEnd();
+      }
     }
     clearTimeout(nextDay);
     const midnight = new Date();
@@ -162,7 +182,18 @@ async function start(): Promise<void> {
   ui.journal.setAttribute('aria-busy', 'false');
   updateStatus();
 
-  ui.settingsButton.onclick = () => { closePhotoMenu(); ui.dialog.append(ui.notice); ui.dialog.showModal(); };
+  // Follow delayed photo layout and keyboard resize only until the person acts.
+  const stopOpeningScroll = () => { openingEditor = undefined; };
+  for (const event of ['pointerdown', 'keydown', 'touchmove', 'wheel']) {
+    document.addEventListener(event, stopOpeningScroll, { capture: true, passive: true });
+  }
+  const revealOpening = () => { if (!ui.dialog.open) openingEditor?.revealEnd(); };
+  ui.journal.addEventListener('load', revealOpening, true);
+  window.visualViewport?.addEventListener('resize', revealOpening);
+
+  ui.settingsButton.onclick = () => {
+    closePhotoMenu(); ui.dialog.append(ui.notice); ui.dialog.showModal(); void storage.refresh();
+  };
   ui.closeSettings.onclick = () => ui.dialog.close();
   ui.dialog.addEventListener('click', event => { if (event.target === ui.dialog && event.clientX) {
     const box = ui.dialog.getBoundingClientRect();

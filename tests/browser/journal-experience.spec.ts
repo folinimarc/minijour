@@ -1,0 +1,203 @@
+import { expect, test, type Page } from '@playwright/test';
+import * as A from '@automerge/automerge';
+import { zipSync } from 'fflate';
+import { createDay, editDay } from '../../src/domain/day';
+import { addTestPhoto, openJournal, replaceEntry } from './helpers';
+
+const TODAY = '2026-10-25';
+
+async function restoreDays(page: Page, days: Record<string, string>) {
+  const files = Object.fromEntries(Object.entries(days).map(([date, text]) => [
+    `minijour/${date}.automerge`, A.save(editDay(createDay(date), text)),
+  ]));
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.locator('#restore-input').setInputFiles({ name: 'test.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync(files)) });
+  await expect(page.getByRole('alert')).toContainText('Backup restored');
+  await page.getByRole('button', { name: 'Close settings' }).click();
+}
+
+async function mockStorage(page: Page, mode: 'denied' | 'granted' | 'unsupported' | 'error' = 'denied') {
+  await page.addInitScript(mode => {
+    const storage = navigator.storage;
+    Object.defineProperty(storage, 'persisted', { configurable: true, value: mode === 'unsupported' ? undefined : async () => {
+      if (mode === 'error') throw new Error('Persistence check unavailable');
+      return mode === 'granted' || localStorage.getItem('test:protected') === 'yes';
+    } });
+    Object.defineProperty(storage, 'persist', { configurable: true, value: mode === 'unsupported' ? undefined : async () => {
+      localStorage.setItem('test:persist-calls', String(Number(localStorage.getItem('test:persist-calls')) + 1));
+      if (mode === 'error') throw new Error('Persistence request unavailable');
+      if (localStorage.getItem('test:grant-next') === 'yes') { localStorage.setItem('test:protected', 'yes'); return true; }
+      return mode === 'granted';
+    } });
+  }, mode);
+}
+
+test('opens at the end of today, keeps the header visible, and preserves deliberate scrolling', async ({ page, context }) => {
+  await page.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
+  await openJournal(page);
+  await restoreDays(page, {
+    '2026-10-24': 'An earlier memory.\n\n'.repeat(60),
+    [TODAY]: 'A line from today.\n\n'.repeat(60) + 'Ready to continue here.',
+  });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.reload();
+  const today = page.locator(`[data-date="${TODAY}"] .cm-content`);
+  await expect(today).toBeFocused();
+  const lastLine = today.locator('.cm-line').last();
+  await expect(lastLine).toContainText('Ready to continue here.');
+  await expect(lastLine).toBeInViewport({ ratio: 0.99 });
+  await expect(page.locator('.topbar')).toBeInViewport({ ratio: 0.99 });
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+  expect(await page.evaluate(() => window.getSelection()?.anchorOffset)).toBe('Ready to continue here.'.length);
+  await page.screenshot({ path: 'test-results/journal-opening-mobile.png' });
+  await page.setViewportSize({ width: 390, height: 500 });
+  await expect(lastLine).toBeInViewport({ ratio: 0.99 });
+  // Scrolling to an older date ends automatic following, including on sync.
+  await page.mouse.wheel(0, -30000);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(10);
+  const other = await context.newPage();
+  await other.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
+  await openJournal(other);
+  await other.locator(`[data-date="${TODAY}"] .cm-content`).click();
+  await other.keyboard.press('ControlOrMeta+End');
+  await other.keyboard.insertText(' Another device added this.');
+  await expect(today).toContainText('Another device added this.');
+  expect(await page.evaluate(() => window.scrollY)).toBeLessThan(10);
+  await expect(page.locator('.topbar')).toBeInViewport({ ratio: 0.99 });
+});
+
+test('hides older blank dates, preserves focused undo, and reveals entries received from another tab', async ({ page, context }) => {
+  await page.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
+  await openJournal(page);
+  await restoreDays(page, { '2026-10-23': ' \n\t', '2026-10-24': 'An older memory.' });
+  await expect(page.locator('.day:visible .day-heading time')).toHaveText(['2026-10-24', TODAY]);
+  const older = page.locator('[data-date="2026-10-24"] .cm-content');
+  await older.click(); await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
+  await expect(older).toBeFocused();
+  await expect(older).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Z');
+  await expect(older).toContainText('An older memory.');
+  await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace');
+  await page.locator(`[data-date="${TODAY}"] .cm-content`).click();
+  await expect(older).toBeHidden();
+  await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);
+  await expect(page.locator('.day:visible').first()).toHaveCSS('border-top-width', '0px');
+  const other = await context.newPage();
+  await other.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
+  await openJournal(other);
+  await restoreDays(other, { '2026-10-23': 'An entry from another tab.' });
+  await expect(page.locator('[data-date="2026-10-23"] .cm-content')).toBeVisible();
+  await expect(page.locator('.day:visible .day-heading time')).toHaveText(['2026-10-23', TODAY]);
+});
+
+test('keeps the opening cursor visible when a photo finishes loading later', async ({ page }) => {
+  await openJournal(page);
+  await page.keyboard.insertText('An earlier line.\n\n'.repeat(45));
+  await addTestPhoto(page);
+  await page.keyboard.insertText('\nContinue below this photo.');
+  // Hold only journal photo loads until after the opening scroll has happened.
+  await page.addInitScript(() => {
+    const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!;
+    const pending: (() => void)[] = [];
+    Object.defineProperty(HTMLImageElement.prototype, 'src', { ...src, set(value: string) {
+      if (value.startsWith('blob:')) pending.push(() => src.set!.call(this, value));
+      else src.set!.call(this, value);
+    } });
+    document.addEventListener('test:load-photos', () => { pending.splice(0).forEach(load => load()); });
+  });
+  await page.reload();
+  const lastLine = page.locator('.cm-content .cm-line').last();
+  await expect(lastLine).toContainText('Continue below this photo.');
+  await expect(lastLine).toBeInViewport({ ratio: 0.99 });
+  await expect(page.locator('.photo-preview img')).toHaveCount(1);
+  await page.evaluate(() => document.dispatchEvent(new Event('test:load-photos')));
+  await expect.poll(() => page.locator('.photo-preview img').evaluate((image: HTMLImageElement) => image.naturalHeight)).toBeGreaterThan(0);
+  await expect(lastLine).toBeInViewport({ ratio: 0.99 });
+});
+
+test('keeps only today visible when a blank day rolls over', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-10-24T21:59:59Z') });
+  await openJournal(page);
+  await replaceEntry(page, ' \n\t');
+  await page.clock.runFor(2100);
+  await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);
+  await expect(page.locator(`[data-date="${TODAY}"] .cm-content`)).toBeFocused();
+  await page.reload();
+  await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);
+});
+
+test('explains declined persistence once, keeps writing, and allows an explicit retry', async ({ page }) => {
+  await mockStorage(page);
+  await openJournal(page); await page.keyboard.insertText('My journal still saves.');
+  await expect(page.getByRole('alert')).toContainText('browser may clear it');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await page.getByRole('button', { name: 'Dismiss message' }).click();
+  await page.reload();
+  await expect(page.locator('.cm-content')).toContainText('My journal still saves.');
+  await page.keyboard.insertText(' More writing.');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('alert')).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBe('1');
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await expect(page.locator('#storage-status')).toHaveText('Not protected from automatic cleanup');
+  await page.evaluate(() => localStorage.setItem('test:grant-next', 'yes'));
+  await page.getByRole('button', { name: 'Request persistent storage' }).click();
+  await expect(page.locator('#storage-status')).toHaveText('Protected from automatic cleanup');
+  await expect(page.locator('#request-storage')).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBe('2');
+  await page.reload();
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await expect(page.locator('#storage-status')).toHaveText('Protected from automatic cleanup');
+});
+
+for (const mode of ['granted', 'unsupported', 'error'] as const) {
+  test(`keeps ordinary saves working when persistence is ${mode}`, async ({ page }) => {
+    await mockStorage(page, mode);
+    await openJournal(page); await page.keyboard.insertText('A saved memory.');
+    await expect(page.getByRole('status')).toHaveText('Saved on this device');
+    if (mode !== 'granted') await expect(page.getByRole('alert')).toContainText('browser may clear it');
+    else await expect(page.getByRole('alert')).toBeHidden();
+    await page.reload();
+    await expect(page.locator('.cm-content')).toContainText('A saved memory.');
+    await page.getByRole('button', { name: 'Settings and backup' }).click();
+    await expect(page.locator('#storage-status')).toContainText(mode === 'granted' ? 'Protected from automatic cleanup'
+      : mode === 'unsupported' ? 'not supported' : 'Could not check');
+    if (mode === 'error') await expect(page.locator('#request-storage')).toBeVisible();
+    else await expect(page.locator('#request-storage')).toBeHidden();
+  });
+}
+
+test('does not replace a save failure with storage-persistence advice', async ({ page }) => {
+  await mockStorage(page);
+  await openJournal(page);
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args: Parameters<typeof put>) {
+      if (this.name === 'days') throw new DOMException('Device storage is full.', 'QuotaExceededError');
+      return put.apply(this, args);
+    };
+  });
+  await page.keyboard.insertText('Keep this pending memory.');
+  await expect(page.getByRole('alert')).toContainText('Device storage is full.');
+  await expect(page.getByRole('status')).toHaveText('Could not save on this device');
+  expect(await page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBeNull();
+  await page.getByRole('button', { name: 'Settings and backup' }).click();
+  await page.getByRole('button', { name: 'Request persistent storage' }).click();
+  await expect(page.getByRole('alert')).toContainText('Device storage is full.');
+});
+
+test('does not repeat automatic permission requests when another notice occupied the first message', async ({ page }) => {
+  await mockStorage(page);
+  await openJournal(page);
+  await page.evaluate(() => {
+    document.getElementById('notice-text')!.textContent = 'An existing message.';
+    document.getElementById('notice')!.hidden = false;
+  });
+  await page.keyboard.insertText('First saved memory.');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBe('1');
+  await expect(page.getByRole('alert')).toHaveText('An existing message.');
+  await page.reload();
+  await page.keyboard.insertText(' More writing.');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  expect(await page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBe('1');
+});

@@ -50,6 +50,7 @@ src/
   ui/
     photo-cleanup.ts  Review, confirmation, and required cloud sync
     cloud-settings.ts Connection, password unlock, and legacy import controls
+    storage-settings.ts Persistence status, one-time advice, and explicit retry
     shell.ts          Static application markup and element references
     editor.ts         CodeMirror editor and photo previews
     photos.ts         Image resizing and local display URLs
@@ -73,6 +74,12 @@ Both pages register the same service worker, which precaches both shells. Naviga
 ### The data model
 
 The interface is one continuous chronological page. Internally, **each day is its own Automerge document containing `{ text: string }`**, displayed in a separate editor. Export combines the sections into one `journal.md` with `# YYYY-MM-DD` headings. Day boundaries are managed by the app; a selection or undo history stays within its day's editor.
+
+`hasContent()` treats whitespace-only text as empty. The journal hides empty dates other than today, except while their editor has focus so clearing text does not interrupt undo. It never deletes their documents. Markdown export skips empty dates; ZIP editing-history files and cloud sync retain them. Visibility updates on edits, incoming merges, and date changes.
+
+The top bar is sticky. On opening, the editor explicitly scrolls its final position into view; delayed photo loads and viewport resizing can repeat that reveal until the first user interaction. Browser scroll restoration is disabled on the journal page. After interaction, incoming sync preserves the person's position.
+
+`ui/storage-settings.ts` checks persistence separately from saving. It requests protection after the first successful edit, records the attempt and whether advice was shown in local preferences, and then leaves retries to the settings button. A refusal or unsupported API does not disable IndexedDB saves. Advice never replaces an existing notice or journal save error. These preferences stay on the device and are excluded from backups.
 
 Per-day documents keep transfers smaller and make a date heading unique without trying to merge independently inserted headings in freeform text. Devices construct the same immutable creation change for a given date, then switch to fresh actor IDs for actual edits. This shared starting point matters: independently creating two nested text objects would cause property conflicts rather than collaborative text edits. The fixed creation actor must never be used for subsequent typing.
 

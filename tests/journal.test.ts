@@ -7,6 +7,7 @@ import { exportJournal, importJournal } from '../src/storage/backup';
 import { SyncEngine } from '../src/sync/engine';
 import { DropboxFiles } from '../src/sync/dropbox';
 import { MemoryCloud } from './helpers';
+import { strFromU8, unzipSync } from 'fflate';
 
 const DATE = '2026-10-24';
 function saveConnection(journal: Journal, value: { appKey: string; accountId: string }, options = {}) {
@@ -195,4 +196,24 @@ it('exports a portable backup and restores history, photos, and offline changes'
   expect(restored.days.get(DATE)!.text).toContain('Another memory.');
   expect(await (await restored.local.photo(name))!.text()).toBe('photo');
   expect(await restored.local.setting('dropbox-connection')).toBeUndefined();
+});
+
+it('omits blank dates from Markdown while keeping their editing history restorable', async () => {
+  const journal = await device();
+  await journal.edit(DATE, 'An older entry that was cleared.');
+  await journal.edit(DATE, ' \n\t');
+  await journal.ensureDay('2026-10-25');
+  expect(markdown(journal.days)).toBe('');
+  const name = `${crypto.randomUUID()}.jpg`;
+  await journal.ensureDay('2026-10-26');
+  await journal.edit('2026-10-26', `![Photo](photos/${name})`);
+  const exported = await exportJournal(journal);
+  const files = unzipSync(new Uint8Array(await exported.arrayBuffer()));
+  expect(strFromU8(files['journal.md'])).toBe(`# 2026-10-26\n\n![Photo](photos/${name})\n`);
+  expect(files[`minijour/${DATE}.automerge`]).toBeDefined();
+  expect(files['minijour/2026-10-25.automerge']).toBeDefined();
+  const restored = await device();
+  await importJournal(restored, new File([exported], 'blank-history.zip'));
+  expect(heads(restored.days.get(DATE)!)).toEqual(heads(journal.days.get(DATE)!));
+  expect(restored.days.get(DATE)!.text).toBe(' \n\t');
 });

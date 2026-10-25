@@ -1,6 +1,8 @@
 @import './base.css';
 
-.topbar { height: 88px; max-width: 1160px; padding: 0 44px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+:root { --header-height: 88px; }
+html { scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top) + 16px); }
+.topbar { position: sticky; top: 0; z-index: 10; height: calc(var(--header-height) + env(safe-area-inset-top)); max-width: 1160px; padding: env(safe-area-inset-top) 44px 0; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--paper); border-bottom: 1px solid var(--line); }
 .wordmark { color: var(--ink); display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
 .wordmark svg { width: 23px; height: 23px; }
 .wordmark span { font-size: 19px; letter-spacing: -.7px; font-weight: 550; }
@@ -13,7 +15,7 @@
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
 .icon-button:hover { background: var(--line); color: var(--ink); }
 #journal { width: min(100% - 48px, 680px); margin: 68px auto 0; padding-bottom: max(180px, 24vh); }
-.day + .day { border-top: 1px solid var(--line); margin-top: 56px; padding-top: 48px; }
+.day:not([hidden]) ~ .day:not([hidden]) { border-top: 1px solid var(--line); margin-top: 56px; padding-top: 48px; }
 .day-heading { display: flex; align-items: baseline; gap: 18px; margin-bottom: 24px; }
 .day-heading h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 400; letter-spacing: -.7px; margin: 0; }
 .weekday { color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
@@ -58,7 +60,8 @@ input[readonly] { font-size: 11px; }
 .dialog-footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; letter-spacing: .2px; }
 .app-version { color: var(--muted); font-size: 11px; font-weight: 400; }
 @media (max-width: 600px) {
-  .topbar { height: 74px; padding: 0 22px; }
+  :root { --header-height: 74px; }
+  .topbar { padding-right: 22px; padding-left: 22px; }
   .topbar-right { gap: 5px; }
   .wordmark span { font-size: 18px; }
   .wordmark svg { width: 21px; height: 21px; }

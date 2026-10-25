@@ -4,11 +4,13 @@
 
 ## Write
 
-Choose **Open journal** from the information page, or open `/journal/` directly. Installed apps launch straight into the journal. Today's local date is prepared, with the cursor at the end. Type Markdown; changes save automatically. Dates follow your device's timezone. A new section appears at midnight or when you return after the date changes.
+Choose **Open journal** from the information page, or open `/journal/` directly. Installed apps launch straight into the journal. Today's local date is prepared, with the cursor and view at the end of its entry. The top bar stays visible while you scroll. Type Markdown; changes save automatically. Dates follow your device's timezone. A new section appears at midnight or when you return after the date changes.
 
 Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have inline previews; their Markdown links remain editable.
 
 Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **…** for cloud sync, backups, and installation information.
+
+Today's section stays visible even when empty. Other dates containing only whitespace are hidden; a section you are clearing stays visible until you leave its editor, so you can still undo. A photo's Markdown link counts as content. Empty dates are omitted from exported Markdown, while the backup retains their editing history for restore and merging.
 
 ## Install
 
@@ -50,7 +52,9 @@ The local database and exported backups are **not encrypted by minijour**. A rem
 
 There is no analytics, advertising, or external font loading. You trust the code served by the website you use. Tokens stay on the device and are excluded from backups. You can revoke authorization in your Dropbox account settings.
 
-Without cloud sync or an exported backup, clearing browser data or losing the device loses the journal. The app requests persistent storage after your first edit, but permission can be denied. If a local save fails, pending edits remain in memory: download a backup before closing.
+Without cloud sync or an exported backup, clearing browser data or losing the device loses the journal. The app requests persistent storage after your first successful edit. Browsers may decline this automatically or ask for permission. A declined request does not stop saving, but the browser may clear local data to free space.
+
+If protection is not granted, a dismissible message appears once on this device. **… → Device storage** keeps the status available and offers **Request persistent storage** when supported. After a declined request, automatic requests stop; you can retry from settings. Even protected storage is removed when you clear browser data, so keep backups. If a local save actually fails, the app shows a save error; pending edits remain in memory, so download a backup before closing.
 
 ## Clean up unused photos
 
@@ -68,7 +72,7 @@ Update minijour on all devices before using permanent cleanup. Older app version
 
 Choose **Download backup** to save a ZIP containing:
 
-- `journal.md`: all dates and text as ordinary Markdown.
+- `journal.md`: dates with content and their text as ordinary Markdown.
 - `photos/`: JPEG attachments referenced by the Markdown.
 - `minijour/`: Automerge text history for restore and future merging, plus permanent photo deletion records when present.
 
