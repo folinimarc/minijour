@@ -105,7 +105,6 @@ export function mountShell() {
         <p class="help">© 2026 folinimarc and contributors. Free software under <a href="${new URL('LICENSE.txt', appRoot).href}" target="_blank" rel="noopener noreferrer">GPL v3.0</a>, without warranty. You may redistribute it under that license.</p>
         <p class="help"><a href="${__SOURCE_URL__}" target="_blank" rel="noopener noreferrer">Source for this build</a> · <a href="${new URL('THIRD_PARTY_NOTICES.txt', appRoot).href}" target="_blank" rel="noopener noreferrer">Dependency notices</a></p>
       </section>
-      <div class="dialog-footer">minijour <span>A place for the everyday.</span></div>
     </dialog>`;
   const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   return {

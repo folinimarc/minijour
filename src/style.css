@@ -61,7 +61,6 @@ input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 1
 .text-button { background: transparent; color: var(--muted); }
 .primary-button:hover { opacity: .85; }
 .secondary-button:hover, .text-button:hover { background: var(--paper); }
-.dialog-footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; letter-spacing: .2px; }
 .app-version { color: var(--muted); font-size: 11px; font-weight: 400; }
 @media (max-width: 600px) {
   :root { --header-height: 74px; }

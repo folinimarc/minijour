@@ -6,8 +6,9 @@ test('explains the app without opening a local journal and links to the editor',
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('./');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Just a journal.');
-  await expect(page.locator('#your-data')).toContainText('unencrypted');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('A Markdown journal.');
+  await expect(page.locator('#your-data')).toContainText('Optional encrypted sync');
+  await expect(page.getByRole('link', { name: 'About your data' })).toHaveCount(0);
   await expect(page.locator('.cm-content')).toHaveCount(0);
   expect(await page.evaluate(() => indexedDB.databases())).toEqual([]);
   await page.screenshot({ path: 'test-results/landing-mobile.png', fullPage: true });
@@ -16,7 +17,7 @@ test('explains the app without opening a local journal and links to the editor',
   await expect(page).toHaveURL(/\/journal\/$/);
   await expect(page.locator('.cm-content')).toBeFocused();
   await page.getByRole('link', { name: 'About minijour', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Just a journal.');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('A Markdown journal.');
   expect(errors).toEqual([]);
 });
 
@@ -52,7 +53,7 @@ test('installs from the landing page and opens the journal offline for the first
   await page.reload();
   await expect(page.locator('.cm-content')).toContainText('First words, written offline.');
   await page.getByRole('link', { name: 'About minijour', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Just a journal.');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('A Markdown journal.');
 });
 
 test('redirects older standalone root launches to writing while allowing the About page', async ({ page }) => {
@@ -65,7 +66,7 @@ test('redirects older standalone root launches to writing while allowing the Abo
   await expect(page).toHaveURL(/\/journal\/$/);
   await expect(page.locator('.cm-content')).toBeFocused();
   await page.getByRole('link', { name: 'About minijour', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Just a journal.');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('A Markdown journal.');
 });
 
 test('forwards old root OAuth callbacks to the journal and clears callback parameters', async ({ page }) => {
@@ -79,7 +80,8 @@ test('keeps the desktop introduction readable and all primary links functional',
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('./');
   await expect(page.getByRole('link', { name: 'Open journal' })).toBeVisible();
-  await page.getByRole('link', { name: 'About your data' }).click();
+  await expect(page.getByRole('link', { name: 'Source code' })).toHaveAttribute('href', /github\.com\/folinimarc\/minijour\/tree\//);
+  await expect(page.getByRole('link', { name: 'GPLv3' })).toHaveAttribute('href', './LICENSE.txt');
   await expect(page.getByRole('heading', { name: 'Where your journal lives' })).toBeInViewport();
   await page.screenshot({ path: 'test-results/landing-desktop.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

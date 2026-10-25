@@ -4,24 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#f7f6f2" />
-    <meta name="description" content="A simple Markdown journal with photos. Saved on your device, with optional encrypted cloud sync. No sign-up." />
+    <meta name="description" content="A Markdown journal with photos, offline writing, and optional encrypted cloud sync." />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <title>minijour · Just a journal</title>
+    <title>minijour · Markdown journal</title>
   </head>
   <body>
     <header class="landing-header">
       <a class="brand" href="./" aria-label="minijour home"><img src="/icon.svg" width="28" height="28" alt="" />minijour</a>
-      <a href="#your-data">About your data</a>
     </header>
     <main class="landing-main">
       <section class="intro" aria-labelledby="intro-title">
         <div class="intro-copy">
-          <p class="eyebrow">Markdown. Photos. That’s it.</p>
-          <h1 id="intro-title">Just a journal.</h1>
-          <p class="lead">Open it and start writing.<br />A new day gets a new date. Add a photo wherever it belongs.</p>
-          <p class="storage-summary">Saved on your device. Cloud sync is optional and encrypted.</p>
+          <h1 id="intro-title">A Markdown journal.</h1>
+          <p class="lead">Daily entries and photos. Saved automatically.</p>
           <a class="open-journal" href="./journal/">Open journal <span aria-hidden="true">↗</span></a>
-          <p class="small-print">No sign-up. Install it for quick, offline writing.</p>
+          <p class="small-print">No sign-up. Install for offline writing.</p>
         </div>
         <figure class="sample" aria-labelledby="sample-caption">
           <div class="sample-entry">
@@ -33,20 +30,19 @@
             <p>Coffee, then a few words.</p>
             <span class="sample-cursor" aria-hidden="true"></span>
           </div>
-          <figcaption id="sample-caption">An example. Your journal starts empty.</figcaption>
+          <figcaption id="sample-caption">Example journal</figcaption>
         </figure>
       </section>
       <section id="your-data" class="data-section" aria-labelledby="data-title">
         <h2 id="data-title">Where your journal lives</h2>
         <dl>
-          <div><dt>On your device</dt><dd>Writing saves automatically in your browser. Once installed, the app works offline. No minijour account, analytics, or ads.</dd></div>
-          <div><dt>In your cloud storage, if you choose</dt><dd>Connect your own account to write across devices. Text, editing history, photos, and filenames are encrypted before upload. Your cloud password stays with you.</dd></div>
-          <div><dt>In a file you can keep</dt><dd>Download your journal as Markdown, with photos and editing history in a ZIP. You can restore it here or read the Markdown elsewhere.</dd></div>
+          <div><dt>Device</dt><dd>Stored in your browser. Works offline.</dd></div>
+          <div><dt>Cloud</dt><dd>Optional encrypted sync to your own account.</dd></div>
+          <div><dt>Files</dt><dd>Export Markdown and photos as a ZIP.</dd></div>
         </dl>
-        <p class="privacy-note">The local journal and downloaded ZIPs are unencrypted. Your cloud provider can see file sizes and upload times. Keep your cloud password safe: there is no password reset. Without cloud sync or a downloaded backup, clearing browser data removes your journal.</p>
       </section>
     </main>
-    <footer class="landing-footer"><span>minijour · Free software, GPLv3</span><div><a id="source-link" href="https://github.com/folinimarc/minijour">Source code</a><a href="./LICENSE.txt">License</a></div></footer>
+    <footer class="landing-footer"><a id="source-link" href="https://github.com/folinimarc/minijour">Source code</a><a href="./LICENSE.txt">GPLv3</a></footer>
     <script type="module" src="/src/landing.ts"></script>
   </body>
 </html>

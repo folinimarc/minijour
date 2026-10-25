@@ -22,13 +22,14 @@ test('ignores blank drafts and writes past and future entries in chronological o
   await openDate(page, '2026-10-20'); await page.keyboard.insertText('A past memory.');
   await openDate(page, TODAY); await page.keyboard.insertText('Today’s memory.');
   await expect(page.locator('.day-heading:visible time')).toHaveText(['2026-10-20', TODAY, '2030-01-02']);
+  await expect.poll(() => storedDates(page)).toEqual(['2026-10-20', TODAY, '2030-01-02']);
   await page.reload();
   await expect(page.locator(`[data-date="${TODAY}"] .cm-content`)).toBeFocused();
   await openDate(page, '2030-01-02');
   await expect(page.locator('[data-date="2030-01-02"]')).toHaveCount(1);
   await page.keyboard.insertText(' More to add.');
   await expect(page.locator('[data-date="2030-01-02"] .cm-content')).toContainText('A future plan. More to add.');
-  expect(await storedDates(page)).toEqual(['2026-10-20', TODAY, '2030-01-02']);
+  await expect.poll(() => storedDates(page)).toEqual(['2026-10-20', TODAY, '2030-01-02']);
 });
 
 test('allows a photo-only entry on an arbitrary date and keeps the date control tucked away', async ({ page }) => {
