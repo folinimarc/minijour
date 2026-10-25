@@ -111,6 +111,9 @@ export class DayEditor {
 
   receive(doc: DayDoc): void {
     if (this.view.composing) { this.deferredDoc = doc; return; }
+    // A newer edit may arrive after composition ends but before its queued
+    // callback runs. Do not let that callback restore an older document.
+    this.deferredDoc = undefined;
     this.displayedDoc = doc;
     const text = doc.text;
     const current = this.view.state.doc.toString();

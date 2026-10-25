@@ -28,6 +28,9 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Fixed
 
+- Prevent an older queued keyboard-composition update from hiding a newer incoming edit.
+- Keep browser test selection and deployment paths consistent with local `.env` configuration and explicit CI overrides.
+
 - Keep cloud provider configuration in deployment documentation and remove developer setup fields from the frontend.
 
 - Block connecting a local journal to another cloud provider, account, or app, including after disconnecting, to prevent accidental cross-account uploads.

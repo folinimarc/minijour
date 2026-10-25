@@ -169,7 +169,7 @@ GitHub Actions runs unit tests and production browser tests on pull requests and
 MINIJOUR_TEST_SUBDIRECTORY=1 VITE_DROPBOX_APP_KEY=testpublickey npm run test:browser
 ```
 
-The key above is synthetic and browser tests mock Dropbox. The build includes version/source metadata and license notices. `scripts/build-info.mjs` supports Git checkouts and downloaded source archives; `scripts/notices.mjs` collects runtime dependency licenses from the lockfile's installed packages.
+The key above is synthetic and browser tests mock Dropbox. Browser tests read the same `.env` and `.env.production` settings as the production build; explicit environment variables override them, including an empty key for local-only testing. The build includes version/source metadata and license notices. `scripts/build-info.mjs` supports Git checkouts and downloaded source archives; `scripts/notices.mjs` collects runtime dependency licenses from the lockfile's installed packages.
 
 ```sh
 npm test

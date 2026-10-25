@@ -92,6 +92,26 @@ test('keeps incoming edits while the other editor is composing text', async ({ p
   await expect(content).toContainText('Composed memory.');
 });
 
+test('does not replace a newer edit with an older queued composition update', async ({ page, context }) => {
+  await page.clock.install();
+  await openJournal(page);
+  const other = await context.newPage();
+  await openJournal(other);
+  const content = page.locator('.cm-content');
+  await content.dispatchEvent('compositionstart');
+  await page.keyboard.insertText('Composed memory.');
+  await expect(other.locator('.cm-content')).toContainText('Composed memory.');
+  // Hold the queued composition-end callback while a newer edit arrives.
+  await page.clock.pauseAt(new Date(Date.now() + 1000));
+  await content.dispatchEvent('compositionend');
+  await other.locator('.cm-content').click();
+  await other.keyboard.press('End');
+  await other.keyboard.insertText(' Remote memory.');
+  await expect(content).toContainText('Remote memory.');
+  await page.clock.runFor(1);
+  await expect(content).toContainText('Remote memory.');
+});
+
 test('downloads a complete backup and restores it on a fresh device', async ({ page, browser }, testInfo) => {
   await openJournal(page);
   await page.keyboard.insertText('A memory to take with me.');
