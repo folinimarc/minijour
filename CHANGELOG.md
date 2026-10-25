@@ -4,6 +4,10 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+
+
+## 0.2.0 - 2026-10-25
+
 ### Added
 
 - A collapsible date sidebar for navigation, opening past or future dates, and deleting entries after confirmation.
@@ -20,7 +24,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 - Show date headings on empty local drafts without saving, syncing, or exporting unwritten entries. Cleared entries retain internal history for safe merging.
 - Support exporting and restoring journals with no saved entries, while retaining compatibility with older backups.
 
-## 0.1.0 - 2026-10-25
+## 0.1.0 - 2026-10-24
 
 ### Added
 
