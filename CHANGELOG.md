@@ -11,6 +11,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Changed
 
+- Use the journal's book logo and wordmark styling on the landing page as well.
 - Shorten the landing page, simplify its storage summary, and remove promotional taglines.
 - Keep the journal header visible while scrolling and open at the end of today's entry.
 - Ignore unwritten dates: drafts have no date heading and are not saved, synced, or exported until text or a photo is added. Cleared entries retain internal history for safe merging, without appearing as empty journal entries.

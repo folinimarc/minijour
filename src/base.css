@@ -20,3 +20,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 [hidden] { display: none !important; }
 button { color: inherit; }
 a { color: var(--accent); text-underline-offset: 3px; }
+.wordmark { color: var(--ink); display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.wordmark svg { width: 23px; height: 23px; }
+.wordmark span { font-size: 19px; letter-spacing: -.7px; font-weight: 550; }
+@media (max-width: 600px) {
+  .wordmark span { font-size: 18px; }
+  .wordmark svg { width: 21px; height: 21px; }
+}

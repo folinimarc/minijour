@@ -48,6 +48,7 @@ src/
     dropbox.ts        Dropbox adapter, OAuth, and API requests
     engine.ts         Pull, Automerge merge, and push
   ui/
+    icons.ts          Inline SVG icons shared by the landing page and journal
     photo-cleanup.ts  Review, confirmation, and required cloud sync
     cloud-settings.ts Connection, password unlock, and legacy import controls
     storage-settings.ts Persistence status, one-time advice, and explicit retry
@@ -70,6 +71,12 @@ If you're learning, follow this path:
 Vite builds two HTML entries: `index.html` for the information page and `journal/index.html` for the editor. There is no client-side router and no server rewrite requirement. `VITE_BASE_PATH` defaults to `/`; set `/minijour/` for project Pages. It controls asset paths and the stable manifest ID. The PWA starts at `./journal/` relative to the manifest, and its scope remains the app root. Manifest `id` resolves against the origin, so it explicitly includes the deployment path to match older installations' identity.
 
 Both pages register the same service worker, which precaches both shells. Navigation fallback is limited to journal URLs, so a cached journal never replaces the landing page. The small landing entry forwards old root PWA launches and OAuth callbacks; `#about` lets installed users deliberately view the landing page. Shared URLs resolve relative to the entry module, keeping links correct in development and built subdirectory deployments. IndexedDB's name and schema stay unchanged.
+
+### Journal logo
+
+The book mark in `ui/icons.ts` was introduced as inline SVG in the [initial implementation](https://github.com/folinimarc/minijour/commit/ebb94a1e35e615696412f5a017ba0d325c86f24e), originally in `ui/shell.ts`. It was created during the assistant-assisted implementation; no third-party source or icon package was recorded. The wordmark uses the device's system font. Both pages share the SVG helper and wordmark styles in `base.css`.
+
+A provenance check on 2026-10-25 searched distinctive SVG path fragments and compared the official [Feather book](https://github.com/feathericons/feather/blob/main/icons/book.svg), [Lucide book](https://github.com/lucide-icons/lucide/blob/main/icons/book.svg) and [notebook](https://github.com/lucide-icons/lucide/blob/main/icons/notebook.svg), and [Tabler book-2](https://github.com/tabler/tabler-icons/blob/main/icons/outline/book-2.svg). None matched this path. This supports treating it as project artwork under the repository's [GPL-3.0-only license](../LICENSE); it does not establish uniqueness or trademark clearance. No separate third-party logo attribution was identified.
 
 ### The data model
 

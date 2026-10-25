@@ -2,7 +2,6 @@
 
 .landing-header, .landing-main, .landing-footer { width: min(1040px, calc(100% - 80px)); margin: auto; }
 .landing-header { height: 88px; display: flex; align-items: center; }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-size: 20px; font-weight: 550; letter-spacing: -.6px; text-decoration: none; }
 .intro { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; align-items: center; padding: 48px 0 64px; }
 h1, h2 { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; }
 h1 { font-size: clamp(44px, 5.5vw, 70px); line-height: 1.1; letter-spacing: -2.7px; margin: 0 0 20px; }
