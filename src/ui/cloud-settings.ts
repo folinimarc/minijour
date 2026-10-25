@@ -40,11 +40,11 @@ export async function setupCloudSettings(
     ui.sync.hidden = !unlocked;
     ui.lock.hidden = !unlocked;
     ui.connectionDescription.textContent = unlocked
-      ? `Connected to ${providerName}. Your journal syncs encrypted.`
-      : session ? `${providerName} is connected. Unlock cloud access to sync. You can keep writing locally.`
-      : providers.length === 0 ? 'Your journal saves on this device. Clearing browser data can remove it. Cloud sync is unavailable on this website; download a backup to keep a copy.'
-      : owner ? 'Your journal saves on this device. Clearing browser data can remove it. Reconnect its original cloud account to resume encrypted sync.'
-      : 'Your journal saves on this device. Clearing browser data can remove it. Connect your own cloud account for encrypted cloud storage and sync across your devices.';
+      ? `Connected to your ${providerName} account for encrypted backup and sync.`
+      : session ? `Your ${providerName} account is connected. Unlock it to back up and sync. You can keep writing on this device.`
+      : providers.length === 0 ? 'Your journal saves on this device, but clearing browser data can remove it. Cloud connection is unavailable on this website. Download a backup to keep a copy.'
+      : owner ? 'Your journal saves on this device, but clearing browser data can remove it. Reconnect your original cloud account to resume encrypted backup and sync.'
+      : 'Your journal saves on this device, but clearing browser data can remove it. Connect your own cloud account for encrypted backup and sync across your devices.';
     ui.confirmation.hidden = !!header;
     ui.password.autocomplete = header ? 'current-password' : 'new-password';
     ui.passwordConfirm.required = !header;

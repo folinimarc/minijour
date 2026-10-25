@@ -1,8 +1,8 @@
 # minijour
 
-A small journal: open it, write Markdown, add a photo. Each new day appears below the last.
+A small journal for daily entries and photos. Open it and start writing.
 
-minijour is an installable, offline-capable web app. It saves on your device first. Optional encrypted cloud sync combines edits across devices with [Automerge](https://automerge.org/). Each person connects their own cloud account. Dropbox is currently supported. No minijour account or application server is required.
+minijour is an installable, offline-capable web app. It saves on your device first. Optional encrypted backup and sync in your own cloud combine edits across devices with [Automerge](https://automerge.org/). Each person connects their own cloud account. Dropbox is currently supported. No minijour account or application server is required.
 
 <img src="docs/images/journal.png" width="320" alt="minijour showing a date heading and a short Markdown journal entry" />
 

@@ -6,13 +6,17 @@ export function mountShell() {
     <header class="topbar">
       <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
       <div class="topbar-right">
-        <button id="status-button" class="status-button" aria-label="Cloud storage and sync settings"><span id="status" class="status" role="status"><span id="cloud-warning" class="cloud-warning" hidden>${icon('warning')}</span><span class="status-dot"></span><span id="status-text">Opening your journal…</span></span></button>
+        <span id="status" class="status" role="status"><span class="status-dot"></span><span id="status-text">Opening your journal…</span></span>
         <div class="header-actions">
-          <button id="dates-button" class="header-button" aria-expanded="false" aria-controls="date-sidebar">Dates</button>
-          <button id="settings-button" class="header-button">Settings</button>
+          <button id="dates-button" class="header-button" aria-expanded="false" aria-controls="date-sidebar" disabled>Dates</button>
+          <button id="settings-button" class="header-button" disabled>Settings</button>
         </div>
       </div>
     </header>
+    <aside id="storage-banner" class="storage-banner" aria-label="Local journal storage" hidden>
+      <p>Your journal saves on this device only, so clearing browser data can remove it. <span id="storage-advice"></span> <button id="storage-settings" class="inline-button">settings</button>.</p>
+      <button id="dismiss-storage-banner" class="secondary-button">Got it, do not show again</button>
+    </aside>
     <main id="journal" aria-label="Your journal" aria-busy="true"></main>
     <dialog id="date-sidebar" class="date-sidebar" aria-labelledby="dates-title">
       <div class="dialog-header"><h1 id="dates-title">Dates</h1><button id="close-dates" class="icon-button" aria-label="Close dates">${icon('close')}</button></div>
@@ -42,9 +46,10 @@ export function mountShell() {
     <dialog id="settings-dialog" aria-labelledby="settings-title">
       <div class="dialog-header"><h1 id="settings-title">Settings</h1><button id="close-settings" class="icon-button" aria-label="Close settings">${icon('close')}</button></div>
       <section id="cloud-section" class="settings-section">
-        <h2>${icon('cloud')}Cloud sync</h2>
-        <p id="connection-description">Your journal saves on this device. Clearing browser data can remove it. Connect your own cloud account for encrypted cloud storage and sync across your devices.</p>
+        <h2>${icon('cloud')}Connect your own cloud</h2>
+        <p id="connection-description">Your journal saves on this device, but clearing browser data can remove it. Connect your own cloud account for encrypted backup and sync across your devices.</p>
         <div id="cloud-providers" class="button-row" hidden></div>
+        <p class="help">How it works: minijour saves your entries, editing history, and photos encrypted in its own folder in your cloud account. Connect the same account on other devices to keep them in sync. Sync runs while the app is open and your cloud is unlocked.</p>
         <div id="cloud-connected" class="button-row" hidden>
           <button id="sync-button" class="primary-button">Sync now</button>
           <button id="lock-button" class="secondary-button">Lock cloud</button>
@@ -65,7 +70,6 @@ export function mountShell() {
           <p id="legacy-cloud-description" class="help"></p>
           <button id="import-legacy-button" class="secondary-button">Import older cloud files</button>
         </div>
-        <p class="help">Text, editing history, and photos are encrypted before upload and shared with devices connected to the same account. Sync runs while minijour is open and cloud access is unlocked.</p>
       </section>
       <section class="settings-section">
         <h2>Download and restore</h2>
@@ -83,8 +87,8 @@ export function mountShell() {
         </div>
       </section>
       <section class="settings-section settings-small">
-        <h2>Install</h2>
-        <p>Install from your browser’s menu, or choose <strong>Add to Home Screen</strong> from the Share menu. After the first visit and offline installation, you can write without a connection.</p>
+        <h2>One tap to write, even offline</h2>
+        <p>Add minijour to your home screen to open straight into your journal. Install from your browser’s menu, or choose <strong>Add to Home Screen</strong> from the Share menu. Once installed, you can write offline.</p>
         <button id="install-button" class="secondary-button" hidden>Install minijour</button>
       </section>
       <section class="settings-section settings-small">
@@ -96,7 +100,8 @@ export function mountShell() {
   const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   return {
     journal: get<HTMLElement>('journal'), status: get<HTMLSpanElement>('status'), statusText: get<HTMLSpanElement>('status-text'),
-    statusButton: get<HTMLButtonElement>('status-button'), cloudWarning: get<HTMLSpanElement>('cloud-warning'),
+    storageBanner: get<HTMLElement>('storage-banner'), storageAdvice: get<HTMLSpanElement>('storage-advice'),
+    storageSettings: get<HTMLButtonElement>('storage-settings'), dismissStorageBanner: get<HTMLButtonElement>('dismiss-storage-banner'),
     settingsButton: get<HTMLButtonElement>('settings-button'), dialog: get<HTMLDialogElement>('settings-dialog'),
     closeSettings: get<HTMLButtonElement>('close-settings'), photoButton: get<HTMLButtonElement>('photo-button'),
     photoMenu: get<HTMLDivElement>('photo-menu'), cameraButton: get<HTMLButtonElement>('camera-button'),

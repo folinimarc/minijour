@@ -36,8 +36,10 @@ test('connects Dropbox and merges offline changes across two browser devices', a
   const first = await phone.newPage();
   const second = await laptop.newPage();
   await openJournal(first);
+  await expect(first.locator('#storage-banner')).toBeVisible();
   await first.keyboard.insertText('Morning walk.');
   await connect(first);
+  await expect(first.locator('#storage-banner')).toBeHidden();
   await openJournal(second);
   await connect(second);
   await expect(second.locator('.cm-content')).toContainText('Morning walk.');
@@ -70,8 +72,8 @@ test('offers only configured cloud providers and uses deployment credentials wit
   await expect(page.getByLabel('Dropbox app key', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('OAuth redirect URI')).toHaveCount(0);
   await expect(page.locator('#cloud-section details, #app-key, #redirect-uri')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Cloud sync', exact: true })).toBeVisible();
-  await expect(page.locator('#connection-description')).toContainText('encrypted cloud storage and sync across your devices');
+  await expect(page.getByRole('heading', { name: 'Connect your own cloud', exact: true })).toBeVisible();
+  await expect(page.locator('#connection-description')).toContainText('encrypted backup and sync across your devices');
   await expect(page.locator('#cloud-providers button')).toHaveCount(1);
   const authorization = page.waitForRequest(request => request.url().startsWith('https://www.dropbox.com/oauth2/authorize?'));
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
@@ -88,6 +90,7 @@ test('blocks a different Dropbox account without sending it any journal data', a
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Connect Dropbox', exact: true })).toBeVisible();
+  await expect(page.locator('#storage-banner')).toBeVisible();
   const previousCalls = mock.apiCalls;
   mock.accountId = 'another-account';
   await page.getByRole('button', { name: 'Connect Dropbox', exact: true }).click();
@@ -95,7 +98,7 @@ test('blocks a different Dropbox account without sending it any journal data', a
   await expect(page.locator('.cm-content')).toContainText('Keep this journal');
   expect(mock.apiCalls).toBe(previousCalls);
   await page.reload();
-  await expect(page.getByRole('status')).toContainText('Cloud storage not configured');
+  await expect(page.getByRole('status')).toContainText('Saved on this device');
   await expect(page.locator('.cm-content')).toContainText('Keep this journal');
   mock.accountId = 'test-account';
   await connect(page);
@@ -118,6 +121,7 @@ test('keeps cloud locked after reload unless remembering was requested, and neve
   await expect(page.locator('.cm-content')).toContainText('Private memory.');
   await page.keyboard.press('End'); await page.keyboard.insertText(' Local writing still works.');
   await expect(page.getByRole('status')).toHaveText('Cloud storage locked');
+  await expect(page.locator('#storage-banner')).toBeHidden();
   expect(mock.revision).toBe(writes);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Unlock cloud', exact: true })).toBeVisible();

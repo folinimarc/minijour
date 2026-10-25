@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#f7f6f2" />
-    <meta name="description" content="A Markdown journal with photos, offline writing, and optional encrypted cloud sync." />
+    <meta name="description" content="Simple, private journaling with daily entries and photos. No sign-up. Write offline, with optional encrypted backup and sync in your own cloud." />
     <link rel="icon" type="image/svg+xml" href="/src/ui/logo.svg" />
-    <title>minijour · Markdown journal</title>
+    <title>minijour · Simple, private journaling</title>
   </head>
   <body>
     <header class="landing-header">
@@ -15,30 +15,18 @@
     <main class="landing-main">
       <section class="intro" aria-labelledby="intro-title">
         <div class="intro-copy">
-          <h1 id="intro-title">A Markdown journal.</h1>
-          <p class="lead">Daily entries and photos. Saved automatically.</p>
+          <h1 id="intro-title">Simple, private journaling.</h1>
+          <p class="lead">Daily entries and photos. Open and start writing.</p>
+          <p class="no-sign-up">No sign-up. Install for offline writing.</p>
           <a class="open-journal" href="./journal/">Open journal <span aria-hidden="true">↗</span></a>
-          <p class="small-print">No sign-up. Install for offline writing.</p>
         </div>
-        <figure class="sample" aria-labelledby="sample-caption">
-          <div class="sample-entry">
-            <div class="sample-date"><time datetime="2026-10-24">2026-10-24</time><span>Saturday</span></div>
-            <p>Walked by the river after lunch.<br />Took the long way home.</p>
-            <p class="sample-markdown">**A good afternoon.**</p>
-            <div class="sample-rule"></div>
-            <div class="sample-date"><time datetime="2026-10-25">2026-10-25</time><span>Sunday</span></div>
-            <p>Coffee, then a few words.</p>
-            <span class="sample-cursor" aria-hidden="true"></span>
-          </div>
-          <figcaption id="sample-caption">Example journal</figcaption>
-        </figure>
+        <div id="journal-mark" class="journal-mark" aria-hidden="true"></div>
       </section>
-      <section id="your-data" class="data-section" aria-labelledby="data-title">
-        <h2 id="data-title">Where your journal lives</h2>
+      <section class="features" aria-label="How minijour works">
         <dl>
-          <div><dt>Device</dt><dd>Stored in your browser. Works offline.</dd></div>
-          <div><dt>Cloud</dt><dd>Optional encrypted sync to your own account.</dd></div>
-          <div><dt>Files</dt><dd>Export Markdown and photos as a ZIP.</dd></div>
+          <div><dt>Straight to writing</dt><dd>Open today's entry and write. Use Markdown, add photos, and browse by date.</dd></div>
+          <div><dt>Your cloud, your choice</dt><dd>Keep your journal on your device, or connect your own cloud for encrypted backup and sync.</dd></div>
+          <div><dt>One tap, even offline</dt><dd>Install on your phone or computer to open straight into your journal, with or without a connection.</dd></div>
         </dl>
       </section>
     </main>

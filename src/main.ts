@@ -9,6 +9,7 @@ import { exportJournal, importJournal } from './storage/backup';
 import { configuredProviders, finishCloudConnection } from './sync/providers';
 import { setupCloudSettings } from './ui/cloud-settings';
 import { setupPhotoCleanup } from './ui/photo-cleanup';
+import { setupStorageBanner } from './ui/storage-banner';
 import { protectStorage } from './storage/persistence';
 import { SyncEngine } from './sync/engine';
 import { JournalView } from './ui/journal-view';
@@ -49,6 +50,7 @@ async function start(): Promise<void> {
 
   await journal.load();
   const afterSave = protectStorage(local);
+  const bannerConnection = await setupStorageBanner(ui, local, providers.length > 0, notify);
   const view = new JournalView(ui.journal, journal, urls, {
     afterSave, notify, canFocus: () => !ui.dialog.open && !ui.dateSidebar.open,
   });
@@ -60,15 +62,13 @@ async function start(): Promise<void> {
   function updateStatus(): void {
     ui.status.classList.toggle('has-error', !!journal.saveError || syncError);
     ui.status.classList.toggle('is-busy', journal.pending > 0 || syncing || cleaning);
-    ui.status.classList.toggle('needs-cloud', !cloudConnected);
-    ui.cloudWarning.hidden = cloudConnected;
     ui.statusText.textContent = journal.saveError ? 'Could not save on this device'
       : journal.pending ? 'Saving…'
       : cleaning ? 'Saved on device · updating photos…'
       : syncing ? 'Saved on device · syncing…'
       : syncError ? 'Saved on device · sync needs attention'
-      : !cloudConnected ? `Cloud storage not configured${navigator.onLine ? '' : ' · offline'}`
       : !navigator.onLine ? 'Saved on device · offline'
+      : !cloudConnected ? 'Saved on this device'
       : !engine ? 'Cloud storage locked'
       : lastSync && !dirty ? `Saved to ${cloudName}`
       : 'Saved on device · waiting to sync';
@@ -155,7 +155,6 @@ async function start(): Promise<void> {
     closePhotoMenu();
     ui.dialog.append(ui.notice); ui.dialog.showModal();
   };
-  ui.statusButton.onclick = () => ui.settingsButton.click();
   ui.closeSettings.onclick = () => ui.dialog.close();
   ui.dialog.addEventListener('click', event => { if (event.target === ui.dialog && event.clientX) {
     const box = ui.dialog.getBoundingClientRect();
@@ -267,6 +266,8 @@ async function start(): Promise<void> {
     },
     notify,
   });
+  ui.datesButton.disabled = false;
+  ui.settingsButton.disabled = false;
   await setupCloudSettings(ui, journal, providers, {
     busy: () => syncing || cleaning,
     activity: value => { cloudWorking = value; },
@@ -275,7 +276,10 @@ async function start(): Promise<void> {
       engine = next; cloudName = name; syncError = false; lastSync = undefined; dirty = true;
       updateStatus();
     },
-    connection: value => { cloudConnected = value; updateStatus(); },
+    connection: value => {
+      cloudConnected = value; bannerConnection(value); updateStatus();
+      view.revealOpening();
+    },
     sync, notify,
   });
   if (justConnected) ui.settingsButton.click();

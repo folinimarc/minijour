@@ -7,11 +7,7 @@ html { scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top) 
 .header-actions { display: flex; align-items: center; gap: 6px; }
 .header-button { min-height: 36px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; font-size: 12px; color: var(--muted); }
 .header-button:hover { color: var(--ink); background: var(--surface); }
-.status-button { padding: 8px 0; border: 0; background: transparent; color: inherit; text-align: left; }
 .status { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); letter-spacing: .1px; }
-.cloud-warning { display: inline-flex; color: #9b794c; }
-.cloud-warning svg { width: 13px; height: 13px; }
-.needs-cloud .status-dot { display: none; }
 .status-dot { width: 5px; height: 5px; background: #7b9472; border-radius: 50%; flex-shrink: 0; }
 .status.has-error .status-dot { background: #b27743; }
 .status.is-busy .status-dot { animation: breathe 1s infinite alternate; }
@@ -19,6 +15,11 @@ html { scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top) 
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
 .icon-button:hover { background: var(--line); color: var(--ink); }
 #journal { width: min(100% - 48px, 680px); margin: 68px auto 0; padding-bottom: max(180px, 24vh); }
+.storage-banner { width: min(1040px, calc(100% - 48px)); margin: 20px auto 0; padding: 14px 16px; display: flex; align-items: center; gap: 24px; border: 1px solid var(--line); border-radius: 8px; background: #f0f1e9; }
+.storage-banner p { flex: 1; margin: 0; font-size: 12px; line-height: 1.7; }
+.storage-banner > button { flex-shrink: 0; }
+.storage-banner:not([hidden]) + #journal { margin-top: 36px; }
+.inline-button { display: inline; padding: 0; border: 0; background: transparent; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
 .day:not([hidden]) ~ .day:not([hidden]) { border-top: 1px solid var(--line); margin-top: 56px; padding-top: 48px; }
 .day:not([hidden]) ~ .day.collapsed:not([hidden]) { margin-top: 20px; padding-top: 20px; }
 .day-heading { font-family: Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 400; letter-spacing: -.7px; margin: 0 0 24px; }
@@ -85,9 +86,9 @@ input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 1
   :root { --header-height: 74px; }
   .topbar { padding-right: 22px; padding-left: 22px; gap: 8px; }
   .topbar-right { flex-direction: column-reverse; align-items: flex-end; gap: 0; }
-  .status-button { padding: 4px 0; }
   .status { font-size: 10px; max-width: 180px; line-height: 1.5; }
   #journal { width: calc(100% - 48px); margin-top: 42px; }
+  .storage-banner { flex-direction: column; align-items: flex-start; gap: 8px; }
   .day-heading { font-size: 25px; margin-bottom: 22px; }
   .day-toggle { gap: 12px; }
   .weekday { font-size: 9px; letter-spacing: 1px; }

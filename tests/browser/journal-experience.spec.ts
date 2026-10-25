@@ -118,29 +118,37 @@ test('advances the writing draft at midnight without saving empty dates', async 
   await expect(page.locator('.day:visible .day-heading time')).toHaveText([TODAY]);
 });
 
-test('opens concise cloud settings from the storage warning and requests persistence once', async ({ page }) => {
+test('explains local storage, opens settings, and remembers banner dismissal across visits', async ({ page, context }) => {
   await mockStorage(page);
   await openJournal(page); await page.keyboard.insertText('My journal still saves.');
-  await expect(page.getByRole('status')).toHaveText('Cloud storage not configured');
-  await expect(page.locator('#cloud-warning')).toBeVisible();
+  const banner = page.getByRole('complementary', { name: 'Local journal storage' });
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(banner).toContainText('clearing browser data can remove it');
   await expect(page.getByRole('alert')).toBeHidden();
-  await page.getByRole('button', { name: 'Cloud storage and sync settings' }).click();
+  await banner.getByRole('button', { name: 'settings', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.locator('#connection-description')).toContainText('Clearing browser data can remove it');
+  await expect(page.getByRole('heading', { name: 'Connect your own cloud', exact: true })).toBeVisible();
+  await expect(page.locator('#connection-description')).toContainText('but clearing browser data can remove it');
   await expect(page.getByRole('heading', { name: 'Device storage', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/settings-mobile.png' });
   await page.getByRole('button', { name: 'Close settings' }).click();
+  await banner.getByRole('button', { name: 'Got it, do not show again' }).click();
+  await expect(banner).toBeHidden();
   await page.reload();
   await expect(page.locator('.cm-content')).toContainText('My journal still saves.');
+  await expect(banner).toBeHidden();
   await page.keyboard.insertText(' More writing.');
-  await expect(page.getByRole('status')).toHaveText('Cloud storage not configured');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
   expect(await page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBe('1');
+  const other = await context.newPage(); await openJournal(other);
+  await expect(other.locator('#storage-banner')).toBeHidden();
 });
 
 for (const mode of ['granted', 'unsupported', 'error'] as const) {
   test(`keeps ordinary saves working when persistence is ${mode}`, async ({ page }) => {
     await mockStorage(page, mode);
     await openJournal(page); await page.keyboard.insertText('A saved memory.');
-    await expect(page.getByRole('status')).toHaveText('Cloud storage not configured');
+    await expect(page.getByRole('status')).toHaveText('Saved on this device');
     await expect(page.getByRole('alert')).toBeHidden();
     await page.reload();
     await expect(page.locator('.cm-content')).toContainText('A saved memory.');
@@ -177,6 +185,6 @@ test('does not repeat automatic permission requests when another notice occupied
   await expect(page.getByRole('alert')).toHaveText('An existing message.');
   await page.reload();
   await page.keyboard.insertText(' More writing.');
-  await expect(page.getByRole('status')).toHaveText('Cloud storage not configured');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
   expect(await page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBe('1');
 });

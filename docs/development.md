@@ -52,6 +52,7 @@ src/
     icons.ts          Inline SVG icons shared by the landing page and journal
     photo-cleanup.ts  Review, confirmation, and required cloud sync
     cloud-settings.ts Connection, password unlock, and legacy import controls
+    storage-banner.ts Local storage advice and remembered dismissal
     shell.ts          Static application markup and element references
     journal-view.ts   Date sections, local drafts, collapse state, lazy editors
     date-navigation.ts Date drawer, date picker, and confirmed entry deletion
@@ -94,7 +95,7 @@ Sync still fetches and merges all days and photos. Deferring document sync until
 
 The top bar is sticky. On opening, the editor explicitly scrolls its final position into view; delayed photo loads and viewport resizing can repeat that reveal until the first user interaction. Browser scroll restoration is disabled on the journal page. After interaction, incoming sync preserves the person's position.
 
-`storage/persistence.ts` requests browser storage protection after the first successful edit. It records the attempt in local preferences and does not repeat automatic requests. A refusal or unsupported API does not disable IndexedDB saves. The clickable header status warns when no cloud account is connected; settings explain browser-data loss and offer configured providers. Storage protection never prevents deliberate clearing of browser data.
+`storage/persistence.ts` requests browser storage protection after the first successful edit. It records the attempt in local preferences and does not repeat automatic requests. A refusal or unsupported API does not disable IndexedDB saves. The header reports save and sync status. `ui/storage-banner.ts` shows local-only storage advice after cloud connection lookup, unless a connection exists or the local `local-storage-banner-dismissed` setting is true. Dismissal is written before hiding the banner, and failures leave it visible. The preference is device-local and excluded from ZIPs and sync. Deployments without providers point to downloaded backups instead. Settings explain browser-data loss and offer configured providers. Storage protection never prevents deliberate clearing of browser data.
 
 Per-day documents keep transfers smaller and make a date heading unique without trying to merge independently inserted headings in freeform text. Devices construct the same immutable creation change for a given date, then switch to fresh actor IDs for actual edits. This shared starting point matters: independently creating two nested text objects would cause property conflicts rather than collaborative text edits. The fixed creation actor must never be used for subsequent typing.
 
