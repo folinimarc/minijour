@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge';
 import { createDay, editDay, heads, localDate, markdown, mergeDays } from '../src/domain/day';
 import { Journal } from '../src/domain/journal';
@@ -31,6 +31,61 @@ afterEach(() => {
 });
 
 describe('Automerge journal model', () => {
+  it('holds multiple edits in memory and writes only changed dates when flushed', async () => {
+    const journal = await device();
+    const save = vi.spyOn(journal.local, 'saveDay');
+    journal.stage(DATE, editDay(A.clone(journal.days.get(DATE)!), 'First'));
+    journal.stage(DATE, editDay(A.clone(journal.days.get(DATE)!), 'First, then more.'));
+    expect(journal.days.get(DATE)!.text).toBe('First, then more.');
+    expect(journal.hasUnsavedChanges).toBe(true);
+    expect(save).not.toHaveBeenCalled();
+    await journal.flush();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(journal.hasUnsavedChanges).toBe(false);
+    await journal.flush();
+    expect(save).toHaveBeenCalledTimes(1);
+    const reopened = new Journal(journal.local, crypto.randomUUID()); journals.push(reopened);
+    await reopened.load();
+    expect(reopened.days.get(DATE)!.text).toBe('First, then more.');
+  });
+
+  it('does not mark edits made during a save as durable until the next batch', async () => {
+    const journal = await device();
+    const save = journal.local.saveDay.bind(journal.local);
+    let finish!: () => void;
+    vi.spyOn(journal.local, 'saveDay').mockImplementationOnce(async (date, bytes) => {
+      await new Promise<void>(resolve => { finish = resolve; });
+      return save(date, bytes);
+    });
+    journal.stage(DATE, editDay(A.clone(journal.days.get(DATE)!), 'First'));
+    const saving = journal.flush();
+    journal.stage(DATE, editDay(A.clone(journal.days.get(DATE)!), 'First, then more.'));
+    finish(); await saving;
+    expect(journal.hasUnsavedChanges).toBe(true);
+    expect(journal.days.get(DATE)!.text).toBe('First, then more.');
+    const reopened = new Journal(journal.local, crypto.randomUUID()); journals.push(reopened);
+    await reopened.load();
+    expect(reopened.days.get(DATE)!.text).toBe('First');
+    await journal.flush(); await reopened.load();
+    expect(reopened.days.get(DATE)!.text).toBe('First, then more.');
+    expect(journal.hasUnsavedChanges).toBe(false);
+  });
+
+  it('retains failed batches for retry, including newer typing', async () => {
+    const journal = await device();
+    vi.spyOn(journal.local, 'saveDay').mockRejectedValueOnce(new Error('Storage full'));
+    journal.stage(DATE, editDay(A.clone(journal.days.get(DATE)!), 'Keep this.'));
+    await expect(journal.flush()).rejects.toThrow('Storage full');
+    expect(journal.hasUnsavedChanges).toBe(true);
+    journal.stage(DATE, editDay(A.clone(journal.days.get(DATE)!), 'Keep this. And this.'));
+    await journal.flush();
+    expect(journal.hasUnsavedChanges).toBe(false);
+    expect(journal.saveError).toBeUndefined();
+    const reopened = new Journal(journal.local, crypto.randomUUID()); journals.push(reopened);
+    await reopened.load();
+    expect(reopened.days.get(DATE)!.text).toBe('Keep this. And this.');
+  });
+
   it('starts independently created days from identical history', () => {
     expect(heads(createDay(DATE))).toBe(heads(createDay(DATE)));
     expect(heads(createDay('2026-10-25'))).not.toBe(heads(createDay(DATE)));

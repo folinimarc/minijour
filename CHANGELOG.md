@@ -4,6 +4,12 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+### Changed
+
+- Batch local saves and encrypted cloud sync after 1.5 seconds without editing. A 10-second check saves pending work during continuous typing when no save occurred in the preceding interval.
+- Avoid serializing the full day on each keystroke. Edits made during a save remain pending for a later batch, and slow cloud requests do not block local saves or trigger immediate extra sync rounds.
+- Show when edits are waiting to save; explicit sync and backgrounding attempt to save pending edits immediately.
+
 ## 0.2.1 - 2026-10-25
 
 ### Fixed

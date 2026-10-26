@@ -85,6 +85,7 @@ test('keeps the opening cursor visible when a photo finishes loading later', asy
   await page.keyboard.insertText('An earlier line.\n\n'.repeat(45));
   await addTestPhoto(page);
   await page.keyboard.insertText('\nContinue below this photo.');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
   // Hold only journal photo loads until after the opening scroll has happened.
   await page.addInitScript(() => {
     const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!;

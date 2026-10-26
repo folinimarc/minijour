@@ -11,6 +11,7 @@ import { setupCloudSettings } from './ui/cloud-settings';
 import { setupPhotoCleanup } from './ui/photo-cleanup';
 import { setupStorageBanner } from './ui/storage-banner';
 import { protectStorage } from './storage/persistence';
+import { Autosave } from './storage/autosave';
 import { SyncEngine } from './sync/engine';
 import { JournalView } from './ui/journal-view';
 import { setupDateNavigation } from './ui/date-navigation';
@@ -41,10 +42,11 @@ async function start(): Promise<void> {
   let syncError = false;
   let lastSync: Date | undefined;
   let dirty = true;
+  let changeRevision = 0;
+  let runningSync: Promise<void> | undefined;
   let engine: SyncEngine | undefined;
   let cloudName: string | undefined;
   const providers = configuredProviders();
-  let syncTimer: ReturnType<typeof setTimeout> | undefined;
   let nextDay: ReturnType<typeof setTimeout>;
   let photoTarget: { date: string; anchor: A.Cursor; head: A.Cursor } | undefined;
 
@@ -52,7 +54,7 @@ async function start(): Promise<void> {
   const afterSave = protectStorage(local);
   const bannerConnection = await setupStorageBanner(ui, local, providers.length > 0, notify);
   const view = new JournalView(ui.journal, journal, urls, {
-    afterSave, notify, canFocus: () => !ui.dialog.open && !ui.dateSidebar.open,
+    notify, canFocus: () => !ui.dialog.open && !ui.dateSidebar.open,
   });
   const editors = view.editors;
   setupDateNavigation(ui, view, notify);
@@ -61,9 +63,10 @@ async function start(): Promise<void> {
 
   function updateStatus(): void {
     ui.status.classList.toggle('has-error', !!journal.saveError || syncError);
-    ui.status.classList.toggle('is-busy', journal.pending > 0 || syncing || cleaning);
+    ui.status.classList.toggle('is-busy', journal.hasUnsavedChanges || journal.pending > 0 || syncing || cleaning);
     ui.statusText.textContent = journal.saveError ? 'Could not save on this device'
       : journal.pending ? 'Saving…'
+      : journal.hasUnsavedChanges ? 'Changes waiting to save…'
       : cleaning ? 'Saved on device · updating photos…'
       : syncing ? 'Saved on device · syncing…'
       : syncError ? 'Saved on device · sync needs attention'
@@ -78,38 +81,58 @@ async function start(): Promise<void> {
 
   async function sync(strict = false): Promise<void> {
     if (cleaning && !strict) return;
+    // Explicit sync also includes edits still waiting for the automatic batch.
+    await journal.flush();
+    await syncCloud(strict);
+  }
+
+  async function syncCloud(strict = false): Promise<void> {
+    if (cleaning && !strict) return;
     if (!engine || !navigator.onLine) {
       updateStatus();
       if (strict) throw new Error('Cloud sync is unavailable. No photos were deleted.');
       return;
     }
     if (syncing) {
-      try { await engine.sync(); } catch (error) { if (strict) throw error; }
+      // Join the current request without asking the engine for another round.
+      if (strict) await runningSync;
       return;
     }
     syncing = true;
+    const revision = changeRevision;
     updateStatus();
     try {
-      await engine.sync();
+      runningSync = engine.sync();
+      await runningSync;
       syncError = false;
       lastSync = new Date();
-      dirty = false;
+      dirty = revision !== changeRevision;
     } catch (error) {
       syncError = true;
       notify(error);
       if (strict) throw error;
-    } finally { syncing = false; updateStatus(); }
+    } finally {
+      syncing = false; runningSync = undefined; updateStatus();
+      if (dirty && !syncError) autosave.changed();
+    }
   }
+
+  // Cloud requests run independently: slow uploads must not block local saves.
+  async function saveBatch(): Promise<void> {
+    await journal.flush();
+    if (dirty && !syncing) void syncCloud().catch(notify);
+  }
+  const autosave = new Autosave(saveBatch,
+    () => journal.hasUnsavedChanges || !!engine && dirty && !cleaning, notify);
 
   function scheduleSync(): void {
     dirty = true;
-    if (!engine || cleaning) return;
-    if (syncing) { void engine.sync().catch(() => {}); return; }
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(() => { void sync(); }, 1500);
+    changeRevision++;
+    autosave.changed();
   }
 
   journal.subscribe(event => {
+    if (event.saved) { autosave.saved(); afterSave(); }
     if (event.date) {
       view.receive(event.date, event.origin);
       scheduleSync();
@@ -231,18 +254,19 @@ async function start(): Promise<void> {
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      void openToday(false).then(() => sync()).catch(notify);
+      void openToday(false).then(scheduleSync).catch(notify);
     } else {
       closePhotoMenu();
-      void sync();
+      void saveBatch().catch(notify);
     }
   });
-  window.addEventListener('online', () => { void sync(); });
+  window.addEventListener('online', scheduleSync);
   window.addEventListener('offline', updateStatus);
   window.addEventListener('beforeunload', event => {
     if (journal.pending || journal.saveError) { event.preventDefault(); event.returnValue = ''; }
   });
-  setInterval(() => { if (document.visibilityState === 'visible') void sync(); }, 30_000);
+  window.addEventListener('pagehide', () => { void saveBatch().catch(notify); });
+  setInterval(() => { if (document.visibilityState === 'visible') scheduleSync(); }, 30_000);
 
   // Updates wait for a reload: replacing an open editor while typing is unsafe.
   const updateSW = registerSW({ onNeedRefresh() { ui.update.hidden = false; }, onRegisterError: () => {
@@ -272,7 +296,6 @@ async function start(): Promise<void> {
     busy: () => syncing || cleaning,
     activity: value => { cloudWorking = value; },
     change: (next, name) => {
-      clearTimeout(syncTimer);
       engine = next; cloudName = name; syncError = false; lastSync = undefined; dirty = true;
       updateStatus();
     },
@@ -284,7 +307,7 @@ async function start(): Promise<void> {
   });
   if (justConnected) ui.settingsButton.click();
 
-  void sync();
+  void sync().catch(notify);
 }
 
 void start().catch(error => {

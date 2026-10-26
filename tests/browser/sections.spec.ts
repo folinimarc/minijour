@@ -92,7 +92,7 @@ test('goes to the current local date without adding a special date row', async (
   await expect(page.locator('[data-date="2026-10-26"] .cm-content')).toBeFocused();
   await expect(page.locator('.day-toggle[aria-expanded=true]')).toHaveCount(1);
   await expect(page.locator('[data-date="2020-02-29"] .day-content')).toBeHidden();
-  expect(await storedDates(page)).toEqual(['2020-02-29']);
+  await expect.poll(() => storedDates(page)).toEqual(['2020-02-29']);
   await page.getByRole('button', { name: 'Dates', exact: true }).click();
   await expect(page.locator('.date-link')).toHaveText(['2026-10-26', TODAY, '2020-02-29']);
 });

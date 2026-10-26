@@ -128,7 +128,7 @@ export async function setupCloudSettings(
       options.notify('Older files imported. The unencrypted originals and their version history remain in cloud storage.');
     } finally { setWorking(false); show(); }
   })().catch(options.notify); };
-  ui.sync.onclick = () => { void options.sync(); };
+  ui.sync.onclick = () => { void options.sync().catch(options.notify); };
   const check = async () => {
     if (working) return;
     setWorking(true); show();

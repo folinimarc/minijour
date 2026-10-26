@@ -40,6 +40,7 @@ src/
   storage/
     local.ts          IndexedDB access, including safe saves from multiple tabs
     persistence.ts    Best-effort browser storage protection after a save
+    autosave.ts       Idle save timer and periodic checkpoint for pending edits
     backup.ts         Portable ZIP export and text history restore
     photo-cleanup.ts  Candidate photo IDs and sizes for explicit review
   sync/
@@ -65,7 +66,7 @@ If you're learning, follow this path:
 
 1. Read `domain/day.ts` and its tests to see how two documents merge.
 2. Read `storage/local.ts` to see how data survives closing the page.
-3. Follow a keystroke from `ui/editor.ts` through `main.ts` to `Journal.merge()`.
+3. Follow a keystroke from `ui/editor.ts` through `JournalView` to `Journal.stage()`, then the save timer in `main.ts` and `storage/autosave.ts`.
 4. Read `sync/cloud.ts`, then `sync/engine.ts`. The engine doesn't know about HTTP or OAuth.
 5. Read `crypto/vault.ts`, which wraps that file contract with encryption, then `sync/provider.ts` and `sync/providers.ts` for connection setup. `sync/dropbox.ts` implements HTTP/OAuth. Encryption stays outside the document and merge logic.
 
@@ -99,7 +100,11 @@ The top bar is sticky. On opening, the editor explicitly scrolls its final posit
 
 Per-day documents keep transfers smaller and make a date heading unique without trying to merge independently inserted headings in freeform text. Devices construct the same immutable creation change for a given date, then switch to fresh actor IDs for actual edits. This shared starting point matters: independently creating two nested text objects would cause property conflicts rather than collaborative text edits. The fixed creation actor must never be used for subsequent typing.
 
-On each editor update, `Automerge.updateText()` records text operations. Incoming copies are combined with `Automerge.merge()`. The editor keeps the document version actually visible during keyboard composition, so incoming sync cannot turn an unfinished Android input into an accidental deletion of remote text. Its receive callback runs only once the incoming document is applied; deferred updates carry that callback so a remotely cleared section is not hidden, or focus moved, during composition. Newer updates replace both the deferred document and callback.
+On each editor update, `Automerge.updateText()` records text operations and `Journal.stage()` merges the document into memory. The keystroke path does not serialize or reload the full day, write IndexedDB, or broadcast to other tabs. `storage/autosave.ts` starts a save after 1.5 seconds without editing. Independently, every 10 seconds it checks for pending work and saves if no batch succeeded in the previous 10 seconds. It skips clean journals and never overlaps local batches. The periodic check can skip one tick after a recent idle save, so continuous typing may leave up to about 20 seconds of unsaved changes; browser suspension or throttling can delay timers further.
+
+`Journal.flush()` snapshots only changed dates. Per-date revisions prevent a completed save from marking newer typing as durable. Failed dates remain pending for retry. Explicit sync, cloud authorization, photo cleanup, and app updates flush pending changes immediately. Backup export includes the current in-memory entries. Backgrounding and page exit attempt an immediate save, but cannot guarantee completion if the browser closes. The status distinguishes edits waiting to save from durable local data. This batching deliberately accepts losing recent unsaved typing in a crash.
+
+Incoming copies are combined with `Automerge.merge()`. The editor keeps the document version actually visible during keyboard composition, so incoming sync cannot turn an unfinished Android input into an accidental deletion of remote text. Its receive callback runs only once the incoming document is applied; deferred updates carry that callback so a remotely cleared section is not hidden, or focus moved, during composition. Newer updates replace both the deferred document and callback.
 
 IndexedDB saves merge inside a read/write transaction. That protects against two tabs writing stale copies. A BroadcastChannel updates other open tabs after a successful save.
 
@@ -138,7 +143,7 @@ A writer ID is unique to each running app instance. It owns one checkpoint per d
 
 The engine lists checkpoints, downloads new revisions, merges them locally, transfers photos, and uploads local changes. Repeated requests are safe because the library recognizes changes it has already seen. Concurrent text merging belongs to Automerge; the engine coordinates file transfer. Remote files are validated before use.
 
-Sync runs after edits settle, on opening/returning online, and every 30 seconds while visible. If edits arrive during a sync, another round follows. **It cannot guarantee uploads while the app is closed or suspended.** Check the saved status before switching devices if you need the latest edit immediately.
+Automatic sync follows a local save batch. Cloud requests run independently so a slow upload cannot block later local checkpoints. Edits during an upload mark the cloud copy as pending; they do not ask the engine for an immediate extra round. After the request finishes, remaining changes wait for another 1.5-second pause or periodic checkpoint. Successful uploads only clear the pending status if no changes arrived during the request. Opening performs an initial sync; returning online/visible and the 30-second remote polling interval request an idle batch too. **Uploads cannot be guaranteed while the app is closed or suspended.** Check the saved status before switching devices if you need the latest edit immediately.
 
 We retain checkpoints and small permanent photo deletion records. Photo files are retained until explicit user-confirmed cleanup. Storage grows with editing history and app sessions; old snapshots aren't automatically deleted. A fresh device initially downloads the available checkpoints and photos; later polls cache unchanged checkpoint revisions in memory. These are deliberate simplicity tradeoffs, and the first areas to revisit for very large journals.
 

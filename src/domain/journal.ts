@@ -3,13 +3,16 @@ import { createDay, editDay, heads, isDate, loadDay, mergeDays, type DayDoc } fr
 import type { LocalStore } from '../storage/local';
 
 export type ChangeOrigin = 'local' | 'remote';
-export type JournalEvent = { date?: string; origin?: ChangeOrigin; photos?: boolean; error?: Error };
+export type JournalEvent = { date?: string; origin?: ChangeOrigin; photos?: boolean; saved?: boolean; error?: Error };
 
 /** The small application model: optimistic editing, durable saves, and events. */
 export class Journal {
   readonly days = new Map<string, DayDoc>();
   private listeners = new Set<(event: JournalEvent) => void>();
   private channel?: BroadcastChannel;
+  private unsaved = new Map<string, number>();
+  private revision = 0;
+  private saving?: Promise<void>;
   pending = 0;
   saveError?: Error;
 
@@ -41,49 +44,68 @@ export class Journal {
     this.listeners.forEach(listener => listener(event));
   }
 
-  private accept(date: string, incoming: DayDoc, origin: ChangeOrigin = 'remote'): boolean {
+  get hasUnsavedChanges(): boolean { return this.unsaved.size > 0; }
+
+  private accept(date: string, incoming: DayDoc, origin: ChangeOrigin = 'remote', needsSave = false): boolean {
     const previous = this.days.get(date);
     const next = previous ? mergeDays(previous, incoming) : incoming;
     if (previous && heads(previous) === heads(next)) return false;
     this.days.set(date, next);
+    if (needsSave) this.unsaved.set(date, ++this.revision);
     this.emit({ date, origin });
     return true;
+  }
+
+  /** Keep typing in memory; the autosave coordinator decides when to write. */
+  stage(date: string, doc: DayDoc): void {
+    if (!isDate(date)) throw new Error('Invalid journal date.');
+    this.accept(date, doc, 'local', true);
   }
 
   async ensureDay(date: string): Promise<void> {
     if (this.days.has(date)) return;
     this.days.set(date, createDay(date));
+    this.unsaved.set(date, ++this.revision);
     this.emit({ date, origin: 'local' });
-    await this.persist(date);
+    await this.flush();
   }
 
   async edit(date: string, text: string): Promise<void> {
     const doc = this.days.get(date);
     if (!doc || doc.text === text) return;
     this.days.set(date, editDay(doc, text));
+    this.unsaved.set(date, ++this.revision);
     this.emit({ date, origin: 'local' });
-    await this.persist(date);
+    await this.flush();
   }
 
   async merge(date: string, bytes: Uint8Array, origin: ChangeOrigin = 'remote'): Promise<void> {
     if (!isDate(date)) throw new Error('Invalid journal date.');
-    if (this.accept(date, loadDay(bytes), origin)) await this.persist(date);
+    if (this.accept(date, loadDay(bytes), origin, true)) await this.flush();
   }
 
   async flush(): Promise<void> {
-    // Also retries any optimistic changes left in memory after a storage error.
-    for (const date of this.days.keys()) await this.persist(date);
+    while (this.saving) await this.saving;
+    if (!this.unsaved.size) return;
+    // Capture one batch. Later edits keep their own revision and remain pending.
+    const batch = [...this.unsaved].map(([date, revision]) => ({ date, revision, doc: A.clone(this.days.get(date)!) }));
+    this.saving = (async () => {
+      for (const { date, revision, doc } of batch) await this.persist(date, revision, doc);
+    })();
+    try { await this.saving; } finally { this.saving = undefined; }
   }
 
-  private async persist(date: string): Promise<void> {
-    const bytes = A.save(this.days.get(date)!);
+  private async persist(date: string, revision: number, doc: DayDoc): Promise<void> {
     this.pending++;
     this.emit({});
     try {
+      const bytes = A.save(doc);
       const saved = await this.local.saveDay(date, bytes);
       this.accept(date, loadDay(saved));
       this.channel?.postMessage({ date, bytes: saved });
+      if (this.unsaved.get(date) === revision) this.unsaved.delete(date);
       this.saveError = undefined;
+      this.emit({ saved: true });
     } catch (error) {
       this.saveError = error instanceof Error ? error : new Error('Could not save on this device.');
       this.emit({ error: this.saveError });

@@ -57,6 +57,7 @@ test('prepends the new local day once after midnight', async ({ page }) => {
   await expect(page.locator('.day-heading time')).toHaveText(['2026-10-25', '2026-10-24']);
   await expect(page.locator('.cm-content').first()).toBeFocused();
   await page.keyboard.insertText('Sunday memory.');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
   await page.reload();
   await expect(page.locator('.day')).toHaveCount(2);
   await openDate(page, '2026-10-24');
@@ -109,6 +110,12 @@ test('does not replace a newer edit with an older queued composition update', as
   await other.locator('.cm-content').click();
   await other.keyboard.press('End');
   await other.keyboard.insertText(' Remote memory.');
+  // The context clock is paused, including the other tab's autosave timer.
+  // Backgrounding saves immediately without running the queued IME callback.
+  await other.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
   await expect(content).toContainText('Remote memory.');
   await page.clock.runFor(1);
   await expect(content).toContainText('Remote memory.');

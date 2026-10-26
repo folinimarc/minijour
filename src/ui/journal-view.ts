@@ -1,4 +1,3 @@
-import * as A from '@automerge/automerge';
 import { createDay, hasContent, isDate, localDate, type DayDoc } from '../domain/day';
 import type { ChangeOrigin, Journal } from '../domain/journal';
 import { DayEditor } from './editor';
@@ -20,7 +19,7 @@ export class JournalView {
 
   constructor(
     private container: HTMLElement, private journal: Journal, private urls: PhotoUrls,
-    private options: { afterSave: () => void; notify: (error: unknown) => void; canFocus: () => boolean },
+    private options: { notify: (error: unknown) => void; canFocus: () => boolean },
   ) {}
 
   get dates(): string[] {
@@ -156,7 +155,7 @@ export class JournalView {
         this.drafts.set(date, next);
         return;
       }
-      void this.journal.merge(date, A.save(next), 'local').then(this.options.afterSave).catch(this.options.notify);
+      try { this.journal.stage(date, next); } catch (error) { this.options.notify(error); }
     }, () => {
       this.activeDate = date;
       this.opened.add(date);
