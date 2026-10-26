@@ -1,21 +1,16 @@
-/** Both automatic timers require a pause; the interval only retries missed saves. */
+/** One idle save timer. Only failed saves schedule a delayed retry. */
 export class Autosave {
   private idle?: ReturnType<typeof setTimeout>;
-  private interval: ReturnType<typeof setInterval>;
   private running = false;
+  private closed = false;
   private revision = 0;
-  private lastSave = performance.now();
   private lastEdit = -Infinity;
 
   constructor(
     private save: () => Promise<void>,
     private hasChanges: () => boolean,
     private onError: (error: unknown) => void,
-  ) {
-    this.interval = setInterval(() => {
-      if (performance.now() - this.lastSave >= 10_000) void this.checkpoint();
-    }, 10_000);
-  }
+  ) {}
 
   changed(): void {
     this.revision++;
@@ -29,25 +24,26 @@ export class Autosave {
 
   get isIdle(): boolean { return performance.now() - this.lastEdit >= 1500; }
 
-  /** Explicit saves count too, so the fallback does not repeat recent work. */
-  saved(): void { this.lastSave = performance.now(); }
+  /** Also used when an explicit action fails to save locally. */
+  retry(): void { if (!this.idle) this.schedule(10_000); }
 
-  private schedule(): void {
+  private schedule(delay = 1500): void {
+    if (this.closed) return;
     clearTimeout(this.idle);
     this.idle = setTimeout(() => {
       this.idle = undefined;
       void this.checkpoint();
-    }, 1500);
+    }, delay);
   }
 
   private async checkpoint(): Promise<void> {
-    if (this.running || !this.isIdle || !this.hasChanges()) return;
+    if (this.closed || this.running || !this.hasChanges()) return;
+    if (!this.isIdle) { this.schedule(); return; }
     this.running = true;
     const revision = this.revision;
     try {
       await this.save();
-      this.saved();
-    } catch (error) { this.onError(error); }
+    } catch (error) { this.retry(); this.onError(error); }
     finally {
       this.running = false;
       // An edit during a slow save stays pending. Never chain an immediate save.
@@ -55,5 +51,5 @@ export class Autosave {
     }
   }
 
-  close(): void { clearTimeout(this.idle); clearInterval(this.interval); }
+  close(): void { this.closed = true; clearTimeout(this.idle); }
 }

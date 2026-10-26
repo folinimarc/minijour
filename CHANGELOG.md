@@ -6,7 +6,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Changed
 
-- Batch local saves and encrypted cloud sync after 1.5 seconds without editing. The 10-second fallback also requires that pause and skips recent successful saves; it never forces a save during continuous typing.
+- Batch local saves and encrypted cloud sync after 1.5 seconds without editing. Failed local saves retry after 10 seconds; new edits use the normal pause again. There is no recurring local-save check.
 - Avoid serializing the full day on each keystroke. Edits made during a save remain pending for a later batch, and slow cloud requests do not block local saves or trigger immediate extra sync rounds.
 - Show when edits are waiting to save; explicit sync and backgrounding attempt to save pending edits immediately.
 - Keep automatic startup, reconnection, and periodic cloud sync behind the same editing pause. Recheck the pause before starting cloud upload if typing resumes during a local save.

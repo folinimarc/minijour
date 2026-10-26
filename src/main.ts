@@ -135,7 +135,8 @@ async function start(): Promise<void> {
   }
 
   journal.subscribe(event => {
-    if (event.saved) { autosave.saved(); afterSave(); }
+    if (event.saved) afterSave();
+    if (event.error) autosave.retry();
     if (event.date) {
       view.receive(event.date, event.origin);
       scheduleSync();
@@ -269,7 +270,7 @@ async function start(): Promise<void> {
     if (journal.pending || journal.saveError) { event.preventDefault(); event.returnValue = ''; }
   });
   window.addEventListener('pagehide', () => { void saveBatch(true).catch(notify); });
-  setInterval(() => { if (document.visibilityState === 'visible') scheduleSync(); }, 30_000);
+  setInterval(() => { if (engine && document.visibilityState === 'visible') scheduleSync(); }, 30_000);
 
   // Updates wait for a reload: replacing an open editor while typing is unsafe.
   const updateSW = registerSW({ onNeedRefresh() { ui.update.hidden = false; }, onRegisterError: () => {

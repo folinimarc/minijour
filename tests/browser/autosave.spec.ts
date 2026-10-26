@@ -65,6 +65,32 @@ test('keeps continuous typing in memory until the same pause required by the idl
   expect(await writes(page)).toBe(1);
 });
 
+test('retries a failed local save without more typing or a cloud connection', async ({ page }) => {
+  await watchWrites(page); await openJournal(page); await pause(page);
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    let failed = false;
+    IDBObjectStore.prototype.put = function (...args: Parameters<typeof put>) {
+      if (this.name === 'days' && !failed) {
+        failed = true;
+        throw new DOMException('Device storage is temporarily unavailable.', 'UnknownError');
+      }
+      return put.apply(this, args);
+    };
+  });
+  await page.keyboard.insertText('Keep this memory.');
+  await page.clock.runFor(1500);
+  await expect(page.getByRole('status')).toHaveText('Could not save on this device');
+  expect(await writes(page)).toBe(0);
+  await page.clock.runFor(9999);
+  expect(await writes(page)).toBe(0);
+  await page.clock.runFor(1);
+  await expect.poll(() => storedText(page)).toBe('Keep this memory.');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await page.clock.runFor(60_000);
+  expect(await writes(page)).toBe(1);
+});
+
 test('requires a pause for later saves and sync rounds while an earlier cloud request is in flight', async ({ page, context }) => {
   test.skip(!process.env.VITE_DROPBOX_APP_KEY, 'Requires a configured provider.');
   const mock = new DropboxMock(); await mock.install(context);
