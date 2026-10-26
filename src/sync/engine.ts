@@ -1,10 +1,13 @@
 import * as A from '@automerge/automerge';
-import { heads, isDate, loadDay, mergeDays, type DayDoc } from '../domain/day';
+import { isDate, loadDay, type DayDoc } from '../domain/day';
+import { heads, mergeDocuments } from '../domain/documents';
 import type { Journal } from '../domain/journal';
 import type { CloudFiles, RemoteFile } from './cloud';
 import { PHOTO_NAME, PHOTO_DELETION_PATH, photoType, decodePhotoDeletions, encodePhotoDeletions } from '../domain/photos';
+import { createPreferences, loadPreferences, type PreferencesDoc } from '../domain/preferences';
 
 const DAY_PATH = /^\/days\/(\d{4}-\d{2}-\d{2})\/([a-f0-9-]+)\.automerge$/;
+const PREFERENCES_PATH = /^\/preferences\/[a-f0-9-]{36}\.automerge$/;
 
 /**
  * Each running app owns one checkpoint per changed day. Separate writers never
@@ -13,7 +16,7 @@ const DAY_PATH = /^\/days\/(\d{4}-\d{2}-\d{2})\/([a-f0-9-]+)\.automerge$/;
  * Day checkpoints are retained; history compaction is deliberately omitted.
  */
 export class SyncEngine {
-  private cache = new Map<string, { revision: string; bytes: Uint8Array; doc?: DayDoc }>();
+  private cache = new Map<string, { revision: string; bytes: Uint8Array; doc?: DayDoc; preferences?: PreferencesDoc }>();
   private dayCache = new Map<string, { signature: string; doc: DayDoc }>();
   private running?: Promise<void>;
   private rerun = false;
@@ -42,6 +45,18 @@ export class SyncEngine {
     const files = await this.cloud.list();
     const listed = new Set(files.map(file => file.path));
     for (const path of this.cache.keys()) if (!listed.has(path)) this.cache.delete(path);
+    let remotePreferences = createPreferences();
+    // Fetch preferences first, so a newly connected device adopts the stored
+    // photo policy before downloading the rest of its journal.
+    for (const file of files) {
+      if (!PREFERENCES_PATH.test(file.path)) continue;
+      const bytes = await this.read(file);
+      const checkpoint = this.cache.get(file.path)!;
+      try { checkpoint.preferences ??= loadPreferences(bytes); }
+      catch (error) { this.cache.delete(file.path); throw error; }
+      remotePreferences = mergeDocuments(remotePreferences, checkpoint.preferences);
+    }
+    await this.journal.mergePreferences(remotePreferences);
     const remoteDeleted = new Set<string>();
     // Read deletion records before transferring any photo. Deletion wins over
     // old offline references, restored backups, and in-flight stale uploads.
@@ -115,6 +130,14 @@ export class SyncEngine {
       const file = await this.cloud.upload(`/days/${date}/${this.writer}.automerge`, bytes);
       this.cache.set(file.path, { revision: file.revision, bytes, doc: checkpoint });
     }
+
+    const preferences = this.journal.preferences;
+    if (preferences.photoOptions && heads(preferences) !== heads(remotePreferences)) {
+      const checkpoint = A.clone(preferences);
+      const bytes = A.save(checkpoint);
+      const file = await this.cloud.upload(`/preferences/${this.writer}.automerge`, bytes);
+      this.cache.set(file.path, { revision: file.revision, bytes, preferences: checkpoint });
+    }
   }
 
   private async remoteDay(date: string, files: RemoteFile[]): Promise<DayDoc> {
@@ -130,7 +153,7 @@ export class SyncEngine {
       const checkpoint = this.cache.get(file.path)!;
       try { checkpoint.doc ??= loadDay(bytes); }
       catch (error) { this.cache.delete(file.path); throw error; }
-      doc = doc ? mergeDays(doc, checkpoint.doc) : checkpoint.doc;
+      doc = doc ? mergeDocuments(doc, checkpoint.doc) : checkpoint.doc;
     }
     this.dayCache.set(date, { signature, doc: doc! });
     return doc!;

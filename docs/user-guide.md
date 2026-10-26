@@ -66,7 +66,7 @@ The browser may grant or decline protection; writing still saves either way. A b
 
 Turn optimization off to keep original file bytes, dimensions, format, and metadata. JPEG, PNG, WebP, GIF, AVIF, HEIC, HEIF, TIFF, and BMP files are supported, up to 30 MB each. Preview support depends on your browser; an original it cannot display has a **Download photo** link. Some browsers cannot optimize HEIC or other formats; turn optimization off to store those originals.
 
-These preferences apply only to newly added photos on this device. Existing photos stay unchanged. The preferences are not synced or included in backups. Cloud sync and ZIP backups preserve the stored photo bytes.
+These preferences apply to newly added photos. They are saved with your journal, included in backups, and encrypted and synced across devices when you connect your own cloud. Settings shows whether they are local or shared through cloud sync. Sync needs unlocked cloud access and an internet connection; offline devices use their last known choice. A newly connected device adopts the saved cloud preference. Existing photos stay unchanged, and cloud sync and ZIP backups preserve their stored bytes.
 
 ### Clean up unused photos
 
@@ -84,7 +84,7 @@ Choose **Download backup** to save a ZIP containing:
 
 - `journal.md`: dates with content and their text as ordinary Markdown.
 - `photos/`: photo attachments referenced by the Markdown, in their stored formats.
-- `minijour/`: backup format metadata, Automerge text history for restore and future merging, plus permanent photo deletion records when present. Unsaved drafts are excluded.
+- `minijour/`: backup format metadata, Automerge text history and photo preferences for restore and future merging, plus permanent photo deletion records when present. Unsaved drafts are excluded.
 
 Only photos referenced in the current Markdown are included; exporting does not clean up storage. Images referenced only by older editing history are omitted.
 

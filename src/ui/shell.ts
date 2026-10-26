@@ -81,7 +81,8 @@ export function mountShell() {
         <label class="checkbox-label"><input id="optimize-photos" type="checkbox" checked disabled /> Optimize new photos</label>
         <div class="photo-size"><label for="photo-max-dimension">Longest side (pixels)</label>
           <input id="photo-max-dimension" type="number" min="1" max="${MAX_PHOTO_DIMENSION}" step="1" value="${DEFAULT_PHOTO_OPTIONS.maxDimension}" required disabled /></div>
-        <p id="photo-options-help" class="help">Resize larger photos and save as JPEG at 85% quality. Applies to new photos on this device.</p>
+        <p id="photo-options-help" class="help">Resize larger photos and save as JPEG at 85% quality. Applies to new photos.</p>
+        <p id="photo-options-scope" class="help">Saved with your journal on this device.</p>
         <p>Removing a photo link does not remove the photo file. Clean up files that no entry uses below.</p>
         <button id="review-photos-button" class="secondary-button">Clean up unused photos</button>
         <div id="photo-cleanup-review" hidden>
@@ -124,6 +125,7 @@ export function mountShell() {
     cloudSection: get<HTMLElement>('cloud-section'), providerList: get<HTMLDivElement>('cloud-providers'),
     optimizePhotos: get<HTMLInputElement>('optimize-photos'), photoMaxDimension: get<HTMLInputElement>('photo-max-dimension'),
     photoOptionsHelp: get<HTMLParagraphElement>('photo-options-help'),
+    photoOptionsScope: get<HTMLParagraphElement>('photo-options-scope'),
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),
     photoCleanupSummary: get<HTMLParagraphElement>('photo-cleanup-summary'),
     confirmPhotoCleanup: get<HTMLButtonElement>('confirm-photo-cleanup'), cancelPhotoCleanup: get<HTMLButtonElement>('cancel-photo-cleanup'),

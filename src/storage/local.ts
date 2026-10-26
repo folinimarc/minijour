@@ -1,11 +1,14 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import * as A from '@automerge/automerge';
-import { loadDay, mergeDays } from '../domain/day';
+import { loadDay } from '../domain/day';
+import { mergeDocuments } from '../domain/documents';
+import { loadPreferences } from '../domain/preferences';
 import { PHOTO_NAME, referencedPhotos } from '../domain/photos';
 
 export const VAULT_KEY_SETTING = 'cloud-vault-key';
 const PHOTO_DELETIONS = 'photo-deletions-v1';
 const CLOUD_OWNER = 'cloud-journal-owner';
+const PREFERENCES = 'journal-preferences';
 export type CloudIdentity = { providerId: string; appId: string; accountId: string };
 
 // Dropbox uses its original storage key; other adapters use a provider prefix.
@@ -46,9 +49,22 @@ export class LocalStore {
     const incoming = loadDay(bytes);
     const tx = this.db.transaction('days', 'readwrite');
     const existing = await tx.store.get(date);
-    const merged = existing ? mergeDays(loadDay(existing), incoming) : incoming;
+    const merged = existing ? mergeDocuments(loadDay(existing), incoming) : incoming;
     const saved = A.save(merged);
     await tx.store.put(saved, date);
+    await tx.done;
+    return saved;
+  }
+
+  async preferences(): Promise<Uint8Array | undefined> { return this.setting<Uint8Array>(PREFERENCES); }
+  async savePreferences(bytes: Uint8Array): Promise<Uint8Array> {
+    const incoming = loadPreferences(bytes);
+    const tx = this.db.transaction('settings', 'readwrite');
+    const existing = await tx.store.get(PREFERENCES) as Uint8Array | undefined;
+    const merged = existing ? mergeDocuments(loadPreferences(existing), incoming) : incoming;
+    const saved = A.save(merged);
+    await tx.store.put(saved, PREFERENCES);
+    await tx.store.delete('photo-options');
     await tx.done;
     return saved;
   }

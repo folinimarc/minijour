@@ -67,7 +67,7 @@ it('preserves original bytes and MIME types through encrypted sync, backup, rest
     bytes: new TextEncoder().encode(`Original ${extension} file bytes, including metadata.\u0000\u00ff`),
   }));
   for (const file of originals) await source.local.savePhoto(file.name, new Blob([file.bytes], { type: file.type }));
-  await source.local.setSetting('photo-options', { optimize: false, maxDimension: 640 });
+  await source.setPhotoOptions({ optimize: false, maxDimension: 640 });
   await source.edit(DATE, originals.map(file => `![Photo](photos/${file.name})`).join('\n'));
   const sourceSync = new SyncEngine(source, encrypted);
   await sourceSync.sync();
@@ -84,6 +84,7 @@ it('preserves original bytes and MIME types through encrypted sync, backup, rest
       expect(new Uint8Array(await stored.arrayBuffer())).toEqual(file.bytes);
     }
     expect(await journal.local.setting('photo-options')).toBeUndefined();
+    expect(journal.photoOptions).toEqual({ optimize: false, maxDimension: 640 });
   }
   await source.edit(DATE, 'Photos removed.');
   expect((await unusedPhotos(source)).map(file => file.name).sort()).toEqual(originals.map(file => file.name).sort());

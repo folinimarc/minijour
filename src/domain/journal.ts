@@ -1,13 +1,17 @@
 import * as A from '@automerge/automerge';
-import { editDay, heads, isDate, loadDay, mergeDays, type DayDoc } from './day';
+import { editDay, isDate, loadDay, type DayDoc } from './day';
+import { heads, mergeDocuments } from './documents';
+import { createPreferences, loadPreferences, changePhotoOptions, type PreferencesDoc } from './preferences';
+import { DEFAULT_PHOTO_OPTIONS, isPhotoOptions, type PhotoOptions } from './photos';
 import type { LocalStore } from '../storage/local';
 
 export type ChangeOrigin = 'local' | 'remote';
-export type JournalEvent = { date?: string; origin?: ChangeOrigin; photos?: boolean; saved?: boolean; error?: Error };
+export type JournalEvent = { date?: string; origin?: ChangeOrigin; photos?: boolean; preferences?: boolean; saved?: boolean; error?: Error };
 
 /** The small application model: optimistic editing, durable saves, and events. */
 export class Journal {
   readonly days = new Map<string, DayDoc>();
+  preferences = createPreferences();
   private listeners = new Set<(event: JournalEvent) => void>();
   private channel?: BroadcastChannel;
   private unsaved = new Map<string, number>();
@@ -23,7 +27,8 @@ export class Journal {
         const { date, bytes } = event.data;
         if (typeof date === 'string' && isDate(date) && bytes instanceof Uint8Array) {
           this.accept(date, loadDay(bytes));
-        } else if (event.data.photo) this.emit({ photos: true });
+        } else if (event.data.preferences instanceof Uint8Array) this.acceptPreferences(loadPreferences(event.data.preferences));
+        else if (event.data.photo) this.emit({ photos: true });
       };
     }
   }
@@ -32,6 +37,20 @@ export class Journal {
     for (const [date, bytes] of await this.local.days()) {
       if (!isDate(date)) throw new Error('Invalid date in local journal.');
       this.days.set(date, loadDay(bytes));
+    }
+    await this.refreshPreferences();
+    // Carry an explicitly chosen setting from the previous device-local UI.
+    if (!this.preferences.photoOptions) {
+      const previous = await this.local.setting<unknown>('photo-options');
+      if (isPhotoOptions(previous)) {
+        try { await this.setPhotoOptions(previous); }
+        catch (error) {
+          // The old choice is already durable. Full storage must not prevent
+          // opening/exporting the journal or switch original photos to JPEG.
+          if (!this.preferences.photoOptions) this.preferences = changePhotoOptions(this.preferences, previous);
+          this.saveError = error instanceof Error ? error : new Error('Could not save journal preferences.');
+        }
+      }
     }
   }
 
@@ -51,7 +70,7 @@ export class Journal {
     // Compare the document versions, not the shared backend's known history:
     // an editor can hold an older view of a backend with newer changes in it.
     if (previous && heads(previous) === heads(incoming)) return false;
-    const next = previous ? mergeDays(previous, incoming) : A.clone(incoming);
+    const next = previous ? mergeDocuments(previous, incoming) : A.clone(incoming);
     if (previous && heads(previous) === heads(next)) return false;
     this.days.set(date, next);
     if (needsSave) this.unsaved.set(date, ++this.revision);
@@ -128,6 +147,42 @@ export class Journal {
     const removed = await this.local.deletePhotos(names, options);
     if (removed.length) this.photosChanged();
     return removed;
+  }
+
+  get photoOptions(): PhotoOptions { return { ...(this.preferences.photoOptions ?? DEFAULT_PHOTO_OPTIONS) }; }
+
+  private acceptPreferences(incoming: PreferencesDoc): void {
+    if (heads(this.preferences) === heads(incoming)) return;
+    const next = mergeDocuments(this.preferences, incoming);
+    if (heads(next) === heads(this.preferences)) return;
+    this.preferences = next;
+    this.emit({ preferences: true });
+  }
+
+  async refreshPreferences(): Promise<void> {
+    const bytes = await this.local.preferences();
+    if (bytes) this.acceptPreferences(loadPreferences(bytes));
+  }
+
+  async setPhotoOptions(options: PhotoOptions): Promise<void> {
+    await this.refreshPreferences();
+    const next = changePhotoOptions(this.preferences, options);
+    await this.savePreferences(next);
+  }
+
+  async mergePreferences(incoming: PreferencesDoc): Promise<void> {
+    if (heads(this.preferences) === heads(incoming)) return;
+    const next = mergeDocuments(this.preferences, incoming);
+    if (heads(next) !== heads(this.preferences)) await this.savePreferences(next);
+  }
+
+  private async savePreferences(doc: PreferencesDoc): Promise<void> {
+    // Explicit settings changes are small and save immediately. Adopt only a
+    // successful write, so a failed setting can roll back without losing text.
+    const saved = await this.local.savePreferences(A.save(doc));
+    if (!this.hasUnsavedChanges && !this.pending) this.saveError = undefined;
+    this.acceptPreferences(loadPreferences(saved));
+    this.channel?.postMessage({ preferences: saved });
   }
 
   close(): void { this.channel?.close(); }

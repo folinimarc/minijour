@@ -9,7 +9,7 @@ export type RememberedVault = { descriptor: string; key: CryptoKey };
 const HEADER = '/vault.json';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
-const logicalPath = new RegExp(`^/(?:days/\\d{4}-\\d{2}-\\d{2}/[a-f0-9-]{36}\\.automerge|photos/${PHOTO_NAME_SOURCE}|deleted-photos/${PHOTO_NAME_SOURCE}\\.json)$`);
+const logicalPath = new RegExp(`^/(?:days/\\d{4}-\\d{2}-\\d{2}/[a-f0-9-]{36}\\.automerge|preferences/[a-f0-9-]{36}\\.automerge|photos/${PHOTO_NAME_SOURCE}|deleted-photos/${PHOTO_NAME_SOURCE}\\.json)$`);
 const objectPath = /^\/objects\/([a-f0-9]{2,240})\.bin$/;
 const hex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 function unhex(value: string): Uint8Array<ArrayBuffer> {

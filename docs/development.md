@@ -44,6 +44,8 @@ Start with the writing path; the cloud code can wait:
 
 For blank-day behavior, save timing, concurrent edits, encryption, and file formats, use the [architecture reference](architecture.md). The reasons behind the less obvious safeguards are documented there and beside the relevant code.
 
+[preferences.ts](../src/domain/preferences.ts) defines a separate Automerge document for photo settings. [documents.ts](../src/domain/documents.ts) shares the version-comparison and merge helpers used by both days and preferences. Displayed defaults are not saved changes, so a fresh device cannot overwrite a cloud preference just by opening the app.
+
 ## Follow the UI pattern
 
 [shell.ts](../src/ui/shell.ts) creates the page markup and returns its DOM references. The inferred `JournalUI` type gives setup functions checked access to those elements without repeating a large interface.

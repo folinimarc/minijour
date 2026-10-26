@@ -36,15 +36,6 @@ export function loadDay(bytes: Uint8Array): DayDoc {
   return doc;
 }
 
-export function mergeDays(left: DayDoc, right: DayDoc): DayDoc {
-  // Clones keep saved/queued versions usable; the editor keeps its actor ID.
-  return A.merge(A.clone(left, { actor: A.getActorId(left) }), A.clone(right));
-}
-
-export function heads(doc: DayDoc): string {
-  return A.getHeads(doc).sort().join(',');
-}
-
 export function editDay(doc: DayDoc, text: string): DayDoc {
   return A.change(doc, draft => A.updateText(draft, ['text'], text));
 }

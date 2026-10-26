@@ -3,7 +3,6 @@ import type { Journal } from '../domain/journal';
 import type { DayEditor } from './editor';
 import type { JournalView } from './journal-view';
 import type { JournalUI } from './shell';
-import { loadPhotoOptions } from './photo-settings';
 import { preparePhoto } from './photos';
 
 /** Keep the cursor's Automerge anchors while the camera or file picker is open. */
@@ -41,7 +40,8 @@ export function setupPhotoInput(ui: JournalUI, journal: Journal, view: JournalVi
     if (!file || !target) return;
     ui.photoButton.disabled = true;
     try {
-      const photo = await preparePhoto(file, await loadPhotoOptions(local));
+      await journal.refreshPreferences();
+      const photo = await preparePhoto(file, journal.photoOptions);
       await local.savePhoto(photo.name, photo.blob);
       const editor = target.editor;
       const anchor = A.getCursorPosition(editor.doc, ['text'], target.anchor);

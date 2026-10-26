@@ -56,7 +56,8 @@ async function start(): Promise<void> {
     () => journal.hasUnsavedChanges || !!engine && dirty && !cleaning, notify);
 
   await journal.load();
-  await setupPhotoSettings(ui, local, notify);
+  if (journal.saveError) notify(journal.saveError);
+  const photoSettingsConnection = setupPhotoSettings(ui, journal, notify);
   const afterSave = protectStorage(local);
   const bannerConnection = await setupStorageBanner(ui, local, providers.length > 0, notify);
   const view = new JournalView(ui.journal, journal, urls, {
@@ -139,6 +140,7 @@ async function start(): Promise<void> {
       view.refreshPhotos();
       scheduleSync();
     }
+    if (event.preferences) scheduleSync();
     updateStatus();
   });
 
@@ -216,7 +218,8 @@ async function start(): Promise<void> {
       updateStatus();
     },
     connection: (value, available) => {
-      cloudConnected = value; cloudAvailable = available; bannerConnection(value); updateStatus();
+      cloudConnected = value; cloudAvailable = available;
+      bannerConnection(value); photoSettingsConnection(value); updateStatus();
       view.revealOpening();
     },
     sync, requestSync: scheduleSync, notify,

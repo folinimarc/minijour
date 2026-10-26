@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge';
 import * as day from '../src/domain/day';
+import * as documents from '../src/domain/documents';
 import { Journal } from '../src/domain/journal';
 import { LocalStore } from '../src/storage/local';
 import { SyncEngine } from '../src/sync/engine';
@@ -30,7 +31,7 @@ it('reuses decoded checkpoints and merged remote days without downloading, decod
   const uploads = cloud.uploads;
   const download = vi.spyOn(cloud, 'download');
   const load = vi.spyOn(day, 'loadDay');
-  const merge = vi.spyOn(day, 'mergeDays');
+  const merge = vi.spyOn(documents, 'mergeDocuments');
   // Provider listing order is not significant.
   const list = cloud.list.bind(cloud);
   vi.spyOn(cloud, 'list').mockImplementation(async () => (await list()).reverse());

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as A from '@automerge/automerge';
-import { createDay, editDay, heads, localDate, markdown, mergeDays } from '../src/domain/day';
+import { createDay, editDay, localDate, markdown } from '../src/domain/day';
+import { heads, mergeDocuments } from '../src/domain/documents';
 import { Journal } from '../src/domain/journal';
 import { LocalStore } from '../src/storage/local';
 import { exportJournal, importJournal } from '../src/storage/backup';
@@ -107,10 +108,10 @@ describe('Automerge journal model', () => {
   it('preserves independent first edits on two offline devices with one date header', () => {
     const phone = editDay(createDay(DATE), 'Saw a fox.\n');
     const laptop = editDay(createDay(DATE), 'A long walk.\n');
-    const merged = mergeDays(phone, laptop);
+    const merged = mergeDocuments(phone, laptop);
     expect(merged.text).toContain('Saw a fox.');
     expect(merged.text).toContain('A long walk.');
-    expect(mergeDays(laptop, phone).text).toBe(merged.text);
+    expect(mergeDocuments(laptop, phone).text).toBe(merged.text);
     expect(markdown(new Map([[DATE, merged]])).match(/# 2026-10-24/g)).toHaveLength(1);
   });
 

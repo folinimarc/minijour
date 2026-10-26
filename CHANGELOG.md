@@ -4,6 +4,10 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+### Changed
+
+- Sync photo optimization preferences with the encrypted journal and include them in backups. Settings explains when these preferences sync across devices.
+
 ### Fixed
 
 - Keep the opening cursor visible when photo dimensions arrive after the first editor layout, while preserving deliberate scrolling. Cover delayed decoding and image loading independently in browser tests.

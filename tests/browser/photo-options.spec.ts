@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { unzipSync } from 'fflate';
 import { expect, test, type Page } from '@playwright/test';
-import { connect, openJournal } from './helpers';
+import { connect, openJournal, sync } from './helpers';
 import { DropboxMock } from './dropbox-mock';
+import { loadPreferences } from '../../src/domain/preferences';
 
 async function samplePhoto(page: Page, width = 800, height = 600) {
   const base64 = await page.evaluate(({ width, height }) => {
@@ -46,6 +47,19 @@ async function storedPhoto(page: Page, name: string) {
   }), name);
 }
 
+async function storedPhotoOptions(page: Page) {
+  const bytes = await page.evaluate(() => new Promise<number[] | undefined>((resolve, reject) => {
+    const open = indexedDB.open('minijour-v1');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result, request = db.transaction('settings').objectStore('settings').get('journal-preferences');
+      request.onsuccess = () => { db.close(); resolve(request.result ? Array.from(request.result) : undefined); };
+      request.onerror = () => reject(request.error);
+    };
+  }));
+  return bytes ? loadPreferences(Uint8Array.from(bytes)).photoOptions : undefined;
+}
+
 test('saves a configurable resize limit, preserves originals when unchecked, and leaves existing photos alone', async ({ page }, testInfo) => {
   await openJournal(page);
   const original = await samplePhoto(page, 1600, 1200);
@@ -54,6 +68,7 @@ test('saves a configurable resize limit, preserves originals when unchecked, and
   await expect(page.getByLabel('Optimize new photos', { exact: true })).toBeChecked();
   const limit = page.getByLabel('Longest side (pixels)', { exact: true });
   await expect(limit).toHaveValue('2400');
+  await expect(page.locator('#photo-options-scope')).toHaveText('Saved with your journal on this device.');
   await limit.fill('640'); await limit.press('Tab');
   await expect(limit).toBeEnabled();
   await page.getByRole('heading', { name: 'Photos', exact: true }).scrollIntoViewIfNeeded();
@@ -86,7 +101,7 @@ test('does not store invalid resize settings and rolls back a failed settings wr
   await page.evaluate(() => {
     const put = IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put = function (...args: Parameters<typeof put>) {
-      if (this.name === 'settings' && args[1] === 'photo-options') throw new DOMException('Could not save photo settings.', 'QuotaExceededError');
+      if (this.name === 'settings' && args[1] === 'journal-preferences') throw new DOMException('Could not save photo settings.', 'QuotaExceededError');
       return put.apply(this, args);
     };
   });
@@ -141,7 +156,8 @@ test('preserves an original PNG through encrypted cloud sync and a downloaded ba
   await expect(other.locator('.photo-preview img')).toBeVisible();
   expect(await storedPhoto(other, name)).toEqual({ type: 'image/png', width: 800, height: 600, hash: createHash('sha256').update(original.buffer).digest('hex') });
   await other.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(other.getByLabel('Optimize new photos', { exact: true })).toBeChecked();
+  await expect(other.getByLabel('Optimize new photos', { exact: true })).not.toBeChecked();
+  await expect(other.locator('#photo-options-scope')).toContainText('Syncs across your devices');
   const downloading = other.waitForEvent('download');
   await other.getByRole('button', { name: 'Download backup', exact: true }).click();
   const zip = testInfo.outputPath('original-backup.zip'); await (await downloading).saveAs(zip);
@@ -152,8 +168,50 @@ test('preserves an original PNG through encrypted cloud sync and a downloaded ba
   await restored.getByRole('button', { name: 'Settings', exact: true }).click();
   await restored.locator('#restore-input').setInputFiles(zip);
   await expect(restored.getByRole('alert')).toContainText('Backup restored');
+  await expect(restored.getByLabel('Optimize new photos', { exact: true })).not.toBeChecked();
+  await expect(restored.locator('#photo-options-scope')).toHaveText('Saved with your journal on this device.');
   expect(await storedPhoto(restored, name)).toEqual(await storedPhoto(other, name));
   await restored.getByRole('button', { name: 'Close settings' }).click();
   await expect(restored.locator('.photo-preview img')).toBeVisible();
   await fresh.close(); await restoredContext.close();
+});
+
+test('updates cloud preferences in an open settings panel without replacing an unfinished numeric edit', async ({ page, context, browser }) => {
+  test.skip(!process.env.VITE_DROPBOX_APP_KEY, 'Requires a configured provider.');
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page); await connect(page);
+  const fresh = await browser.newContext({ serviceWorkers: 'block' }); await mock.install(fresh);
+  const other = await fresh.newPage(); await openJournal(other); await connect(other);
+  await other.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(other.locator('#photo-options-scope')).toContainText('unlocked and online');
+  const otherLimit = other.getByLabel('Longest side (pixels)', { exact: true });
+  await expect(otherLimit).toHaveValue('2400');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const limit = page.getByLabel('Longest side (pixels)', { exact: true });
+  await limit.fill('900'); await limit.press('Tab');
+  await expect(limit).toBeEnabled();
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await sync(page);
+  await other.getByRole('button', { name: 'Sync now', exact: true }).click();
+  await expect(otherLimit).toHaveValue('900');
+  await otherLimit.fill('1234');
+  // The field's change event has not committed this draft yet.
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await limit.fill('1200'); await limit.press('Tab');
+  await expect(limit).toBeEnabled();
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await sync(page);
+  await other.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(async () => (await storedPhotoOptions(other))?.maxDimension).toBe(1200);
+  await expect(other.getByRole('status')).toContainText('Saved to Dropbox');
+  await expect(otherLimit).toHaveValue('1234');
+  await expect(otherLimit).toBeFocused();
+  await otherLimit.press('Tab'); await expect(otherLimit).toBeEnabled();
+  await other.getByRole('button', { name: 'Close settings' }).click();
+  await sync(other); await sync(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(limit).toHaveValue('1234');
+  await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(page.locator('#photo-options-scope')).toHaveText('Saved with your journal on this device.');
+  await fresh.close();
 });
