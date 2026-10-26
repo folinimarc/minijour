@@ -32,7 +32,7 @@ src/
   landing.css         Landing-page layout
   main.ts             Wires the application together and handles user actions
   domain/
-    photos.ts         Conservative photo references and deletion record format
+    photos.ts         Shared photo formats, options, references, deletion records
     day.ts            Date helpers and Automerge document operations
     journal.ts        In-memory journal, durable saves, change notifications
   crypto/
@@ -60,7 +60,8 @@ src/
     date-navigation.ts Date drawer, date picker, and confirmed entry deletion
     editor.ts         CodeMirror editor and composition-safe incoming edits
     photo-previews.ts Stable block decorations and reserved image frames
-    photos.ts         Image resizing and local display URLs
+    photo-settings.ts Device-local options for newly added photos
+    photos.ts         Optional image resizing and local display URLs
   style.css           Journal/editor visual styles
 ```
 
@@ -143,7 +144,7 @@ One local journal uses one provider and account. Switching storage providers or 
 
 ### Cloud file layout
 
-The sync engine works with logical paths `/days/YYYY-MM-DD/<writer-id>.automerge` and `/photos/<photo-id>.jpg`. `EncryptedFiles` translates these before the provider receives anything (Dropbox stores them under its app folder):
+The sync engine works with logical paths `/days/YYYY-MM-DD/<writer-id>.automerge` and `/photos/<photo-id>.<extension>`. `EncryptedFiles` translates these before the provider receives anything (Dropbox stores them under its app folder):
 
 ```text
 minijour-encrypted-v1/
@@ -168,13 +169,13 @@ We retain checkpoints and small permanent photo deletion records. Photo files ar
 
 ### Permanent photo cleanup
 
-`domain/photos.ts` scans for `photos/<UUID>.jpg` paths conservatively, including Markdown reference links and code examples. It checks current text across all days, not just the visible editor. `storage/photo-cleanup.ts` produces a review snapshot of specific IDs and sizes. Only those IDs may be deleted when confirmed; newly unused photos need a new review.
+`domain/photos.ts` defines supported extensions and MIME types for storage, encrypted paths, sync, backups, previews, and cleanup. It scans for `photos/<UUID>.<extension>` paths conservatively, including Markdown reference links and code examples. It checks current text across all days, not just the visible editor. `storage/photo-cleanup.ts` produces a review snapshot of specific IDs and sizes. Only those IDs may be deleted when confirmed; newly unused photos need a new review.
 
 For cloud-bound journals, the UI requires an online, unlocked, successful sync before review and again before deletion. A failed fetch prevents local cleanup. Local removal rechecks references inside an IndexedDB read/write transaction across `days`, `photos`, and `settings`, so saved references from other tabs are respected. Ordinary Markdown deletion never triggers this operation.
 
 The same transaction records permanent deletions in the settings key `photo-deletions-v1` and removes the blobs. The value is a grow-only set represented as a sorted array of photo names. This needs no database schema upgrade. Photo saves check that set transactionally, including downloads, backup restore, and legacy import. Legacy plaintext imports cannot introduce deletion records: those files are ignored outside normal encrypted sync. Preview blob URLs are revoked and rebuilt across tabs after changes.
 
-Sync uses an immutable logical file `/deleted-photos/<photo-id>.jpg.json` for each permanent deletion, containing `{ version: 1, photos: [name] }`. Encryption hides its name and contents like other files. Records are processed before any photo transfer, and a new record must upload successfully before remote bytes are removed. Dropbox removal uses the idempotent adapter contract (`files/delete_v2`; missing files count as success). The encrypted adapter removes every opaque copy of a photo, including concurrent duplicate uploads. A stale upload arriving later is removed on a subsequent sync.
+Sync uses an immutable logical file `/deleted-photos/<photo-id>.<extension>.json` for each permanent deletion, containing `{ version: 1, photos: [name] }`. Encryption hides its name and contents like other files. Records are processed before any photo transfer, and a new record must upload successfully before remote bytes are removed. Dropbox removal uses the idempotent adapter contract (`files/delete_v2`; missing files count as success). The encrypted adapter removes every opaque copy of a photo, including concurrent duplicate uploads. A stale upload arriving later is removed on a subsequent sync.
 
 Deletion wins even if an offline device or old backup later adds a reference. This explicit tradeoff avoids attachment conflict resolution or device clocks. Missing links remain editable; re-adding the original photo produces a fresh ID. Deletion records are retained permanently and restored from new backups. Existing downloaded backups, legacy plaintext cloud files, and provider version history remain outside cleanup.
 
@@ -194,14 +195,16 @@ The unwrapped key is non-exportable in Web Crypto. Optional remember-on-device s
 
 ### Photos and backups
 
-Photos are resized to at most 2400 pixels on the longest side, converted to JPEG at quality 0.85, and given unique filenames. Camera originals are not retained. Markdown stores relative `photos/…` links, never temporary browser blob URLs. Photos are uploaded before documents that reference them.
+`ui/photo-settings.ts` stores validated `{ optimize, maxDimension }` preferences under the local `photo-options` settings key. The default is optimization enabled at 2400 pixels; the allowed longest side is an integer from 1 to 12000. Controls roll back after a failed write, refresh when settings opens, and photo insertion reads the latest saved options, including changes from another tab. Preferences are excluded from sync and backups and never rewrite existing photos.
 
-`ui/photo-previews.ts` supplies block decorations directly through a CodeMirror state field. Photos change vertical layout, so their decorations cover the whole day's text and are not rebuilt from the changing visible range. CodeMirror still controls which blocks have DOM nodes. Preview dimensions are read from the stored image and held in memory with its object URL. An aspect-ratio frame reserves the display area independently of the image element's loading state. Blocks use padding rather than vertical margins and request a layout measurement after asynchronous changes, following the [CodeMirror decoration contract](https://codemirror.net/docs/ref/#view.Decoration^widget). Missing or permanently deleted images keep their text fallback. Date divider spacing uses the same rule for expanded and collapsed sections.
+With optimization enabled, `preparePhoto()` resizes without enlarging, flattens transparency onto white, and encodes JPEG at quality 0.85. With optimization disabled it returns the selected file unchanged, retaining metadata and animation. Supported original formats are JPEG, PNG, WebP, GIF, AVIF, HEIC, HEIF, TIFF, and BMP, up to 30 MB. MIME types or known filename extensions select a canonical extension; SVG and other file formats are rejected. No extra original copy is kept when optimizing. Markdown stores relative `photos/<UUID>.<extension>` links, never temporary browser blob URLs. Photos are uploaded before documents that reference them. Sync and restore derive the MIME type from the extension without re-encoding the bytes.
+
+`ui/photo-previews.ts` supplies block decorations directly through a CodeMirror state field. Photos change vertical layout, so their decorations cover the whole day's text and are not rebuilt from the changing visible range. CodeMirror still controls which blocks have DOM nodes. Preview dimensions are read from the stored image and held in memory with its object URL. An aspect-ratio frame reserves the display area independently of the image element's loading state. Blocks use padding rather than vertical margins and request a layout measurement after asynchronous changes, following the [CodeMirror decoration contract](https://codemirror.net/docs/ref/#view.Decoration^widget). Originals the browser cannot decode get a download link; missing or permanently deleted images keep their text fallback. Date divider spacing uses the same rule for expanded and collapsed sections.
 
 A downloaded backup ZIP contains:
 
 - `journal.md`: your entire journal as ordinary Markdown.
-- `photos/`: portable JPEG attachments referenced by the current Markdown.
+- `photos/`: attachments referenced by the current Markdown, with their stored bytes and formats.
 - `minijour/`: `format.json` with `{ version: 1 }`, Automerge documents for restoring text history and future merging, and optional `photo-deletions.json` for permanent photo deletion records.
 
 The format marker makes a new journal with no saved dates a valid empty backup. It creates no day on restore and does not clear existing entries. Older backups without a marker remain supported when they contain editing-history files. Unsupported format versions are rejected before importing anything. Unsaved UI drafts are never exported.

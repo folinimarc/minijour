@@ -2,7 +2,7 @@ import * as A from '@automerge/automerge';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { isDate, loadDay, markdown } from '../domain/day';
 import type { Journal } from '../domain/journal';
-import { PHOTO_NAME, referencedPhotos, encodePhotoDeletions, decodePhotoDeletions } from '../domain/photos';
+import { PHOTO_NAME, photoType, referencedPhotos, encodePhotoDeletions, decodePhotoDeletions } from '../domain/photos';
 
 const DAY_FILE = /^minijour\/\d{4}-\d{2}-\d{2}\.automerge$/;
 const DELETIONS_FILE = 'minijour/photo-deletions.json';
@@ -52,7 +52,7 @@ export async function importJournal(journal: Journal, file: File): Promise<void>
   await journal.deletePhotos(deleted);
   for (const [path, bytes] of Object.entries(files)) {
     if (path.startsWith('photos/')) {
-      await journal.local.savePhoto(path.slice(7), new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' }));
+      await journal.local.savePhoto(path.slice(7), new Blob([new Uint8Array(bytes)], { type: photoType(path.slice(7)) }));
     }
   }
   for (const [path, bytes] of days) await journal.merge(path.slice(9, 19), bytes);

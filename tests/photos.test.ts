@@ -1,12 +1,13 @@
 import { afterEach, expect, it } from 'vitest';
 import { unzipSync, zipSync, strToU8 } from 'fflate';
 import { Journal } from '../src/domain/journal';
-import { decodePhotoDeletions, encodePhotoDeletions, referencedPhotos } from '../src/domain/photos';
+import { PHOTO_TYPES, PHOTO_NAME, photoExtension, photoType, isPhotoOptions, decodePhotoDeletions, encodePhotoDeletions, referencedPhotos } from '../src/domain/photos';
 import { LocalStore } from '../src/storage/local';
 import { unusedPhotos } from '../src/storage/photo-cleanup';
 import { exportJournal, importJournal } from '../src/storage/backup';
 import { SyncEngine } from '../src/sync/engine';
 import { MemoryCloud } from './helpers';
+import { EncryptedFiles } from '../src/crypto/vault';
 
 const DATE = '2026-10-24';
 const photoName = () => `${crypto.randomUUID()}.jpg`;
@@ -23,6 +24,76 @@ async function photo(journal: Journal, name = photoName()) {
 }
 async function backup(journal: Journal) { return new File([await exportJournal(journal)], 'journal.zip'); }
 afterEach(() => journals.splice(0).forEach(journal => { journal.close(); journal.local.close(); }));
+
+it('uses one supported photo-name format for references, MIME types, and deletion records', () => {
+  const names = Object.entries(PHOTO_TYPES).map(([extension, type]) => {
+    const name = `${crypto.randomUUID()}.${extension}`;
+    expect(PHOTO_NAME.test(name)).toBe(true);
+    expect(photoType(name)).toBe(type);
+    return name;
+  });
+  expect(referencedPhotos(names.map(name => `![Photo](photos/${name})`))).toEqual(new Set(names));
+  expect(decodePhotoDeletions(encodePhotoDeletions(names))).toEqual(names.sort());
+  expect(PHOTO_NAME.test(`${crypto.randomUUID()}.exe`)).toBe(false);
+  expect(referencedPhotos([`photos/${names[0]}.exe`])).toEqual(new Set());
+  expect(() => photoType('../image.png')).toThrow('Invalid photo name');
+});
+
+it('canonicalizes image extensions without accepting unknown or inherited property names', () => {
+  expect(photoExtension({ name: 'camera.JPEG', type: 'image/jpeg' })).toBe('jpg');
+  expect(photoExtension({ name: 'camera.HEIC', type: '' })).toBe('heic');
+  expect(photoExtension({ name: 'scan.TIFF', type: 'application/octet-stream' })).toBe('tif');
+  expect(photoExtension({ name: 'camera.heif', type: 'image/heif-sequence' })).toBe('heif');
+  for (const file of [{ name: 'constructor', type: '' }, { name: 'photo.exe', type: '' }, { name: 'image.svg', type: 'image/svg+xml' }]) {
+    expect(() => photoExtension(file)).toThrow('Choose a JPEG');
+  }
+});
+
+it('validates configurable photo dimensions and the optimization flag', () => {
+  expect(isPhotoOptions({ optimize: false, maxDimension: 2400 })).toBe(true);
+  expect(isPhotoOptions({ optimize: true, maxDimension: 12000 })).toBe(true);
+  for (const maxDimension of [0, -1, 1.5, 12001, Infinity, NaN, '2400']) {
+    expect(isPhotoOptions({ optimize: true, maxDimension })).toBe(false);
+  }
+  expect(isPhotoOptions({ optimize: 'false', maxDimension: 2400 })).toBe(false);
+});
+
+it('preserves original bytes and MIME types through encrypted sync, backup, restore, cleanup, and stale backups', async () => {
+  const cloud = new MemoryCloud();
+  const encrypted = await EncryptedFiles.create(cloud, 'a password for original photo tests');
+  const source = await device(), target = await device();
+  const originals = Object.entries(PHOTO_TYPES).map(([extension, type]) => ({
+    name: `${crypto.randomUUID()}.${extension}`, type,
+    bytes: new TextEncoder().encode(`Original ${extension} file bytes, including metadata.\u0000\u00ff`),
+  }));
+  for (const file of originals) await source.local.savePhoto(file.name, new Blob([file.bytes], { type: file.type }));
+  await source.local.setSetting('photo-options', { optimize: false, maxDimension: 640 });
+  await source.edit(DATE, originals.map(file => `![Photo](photos/${file.name})`).join('\n'));
+  const sourceSync = new SyncEngine(source, encrypted);
+  await sourceSync.sync();
+  const header = (await EncryptedFiles.inspect(cloud))!;
+  const unlocked = await EncryptedFiles.unlock(cloud, header, 'a password for original photo tests');
+  const targetSync = new SyncEngine(target, unlocked);
+  await targetSync.sync();
+  const savedBackup = await backup(source), restored = await device();
+  await importJournal(restored, savedBackup);
+  for (const journal of [target, restored]) {
+    for (const file of originals) {
+      const stored = (await journal.local.photo(file.name))!;
+      expect(stored.type).toBe(file.type);
+      expect(new Uint8Array(await stored.arrayBuffer())).toEqual(file.bytes);
+    }
+    expect(await journal.local.setting('photo-options')).toBeUndefined();
+  }
+  await source.edit(DATE, 'Photos removed.');
+  expect((await unusedPhotos(source)).map(file => file.name).sort()).toEqual(originals.map(file => file.name).sort());
+  await source.deletePhotos(originals.map(file => file.name), { onlyUnused: true });
+  await sourceSync.sync(); await targetSync.sync();
+  await importJournal(target, savedBackup);
+  expect(await target.local.photoNames()).toEqual([]);
+  expect(await target.local.photoDeletions()).toEqual(new Set(originals.map(file => file.name)));
+  expect((await unlocked.list()).filter(file => file.path.startsWith('/photos/'))).toEqual([]);
+});
 
 it('recognizes photo paths conservatively across Markdown styles and all days', async () => {
   const journal = await device();

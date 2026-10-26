@@ -2,7 +2,7 @@ import * as A from '@automerge/automerge';
 import { heads, isDate, loadDay, mergeDays, type DayDoc } from '../domain/day';
 import type { Journal } from '../domain/journal';
 import type { CloudFiles, RemoteFile } from './cloud';
-import { PHOTO_NAME, PHOTO_DELETION_PATH, decodePhotoDeletions, encodePhotoDeletions } from '../domain/photos';
+import { PHOTO_NAME, PHOTO_DELETION_PATH, photoType, decodePhotoDeletions, encodePhotoDeletions } from '../domain/photos';
 
 const DAY_PATH = /^\/days\/(\d{4}-\d{2}-\d{2})\/([a-f0-9-]+)\.automerge$/;
 
@@ -100,7 +100,7 @@ export class SyncEngine {
       if ((await this.journal.local.photoDeletions()).has(name)) continue;
       if (await this.journal.local.photo(name)) continue;
       const bytes = await this.cloud.download(`/photos/${name}`);
-      photosChanged = await this.journal.local.savePhoto(name, new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' })) || photosChanged;
+      photosChanged = await this.journal.local.savePhoto(name, new Blob([new Uint8Array(bytes)], { type: photoType(name) })) || photosChanged;
     }
     if (photosChanged) this.journal.photosChanged();
     if (!upload) return;

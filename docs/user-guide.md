@@ -6,7 +6,7 @@
 
 Choose **Open journal** from the information page, or open `/journal/` directly. Installed apps launch straight into the journal. Today's writing surface is ready, with the cursor and view at the end of its entry. The top bar stays visible while you scroll. Type Markdown; changes save automatically. Dates follow your device's timezone. Daily writing advances to the new date at midnight or when you return after the date changes.
 
-Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have previews; their Markdown links remain editable. Large photos are resized to at most 2400 pixels on the longest side and encoded as JPEG at quality 0.85. The original is not retained.
+Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have previews; their Markdown links remain editable. See **Settings → Photos** to choose how new photos are stored.
 
 Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **Settings** for cloud sync, backups, and installation information.
 
@@ -14,7 +14,7 @@ Entries appear newest first. Only today starts expanded; select a date heading t
 
 Choose **Dates** beside **Settings** to browse all dates. **Go to today** and **Add date** sit below the title. All dates appear in newest-first order. Selecting a date expands its entry, collapses the others, and moves the cursor there. **Add date** shows a picker for any past or future date; an existing date opens its current entry. Opening the app always returns to today. Daily rollover does not interrupt a past or future date you deliberately opened.
 
-The bin beside a date deletes its current text after confirmation. Photos remain in storage until you clean them up separately. Deleting or clearing an entry retains its Automerge history for sync, rather than erasing old checkpoints or backups. Concurrent edits can still merge into that date. Clearing text locally keeps its heading and editor for undo. When another device clears or deletes an entry, its heading and sidebar link disappear without reloading, even if you opened that date earlier. If it was your active date, writing returns to today. Today’s empty writing surface remains available.
+The bin beside a date deletes its current text after confirmation. Today has no bin because its writing surface always remains available; you can clear its text in the editor. Photos remain in storage until you clean them up separately. Deleting or clearing an entry retains its Automerge history for sync, rather than erasing old checkpoints or backups. Concurrent edits can still merge into that date. Clearing text locally keeps its heading and editor for undo. When another device clears or deletes an entry, its heading and sidebar link disappear without reloading, even if you opened that date earlier. If it was your active date, writing returns to today. Today’s empty writing surface remains available.
 
 ## Install
 
@@ -62,7 +62,15 @@ Without cloud sync or an exported backup, clearing browser data or losing the de
 
 The browser may grant or decline protection; writing still saves either way. A banner explains local storage until you connect your own cloud or select **Got it, do not show again**. Dismissal is remembered for future visits in this browser. Its settings link opens cloud connection and backup options. Clearing browser data removes even protected storage. If a local save fails, the app shows a save error; pending edits remain in memory, so download a backup before closing.
 
-## Clean up unused photos
+## Photos
+
+**Optimize new photos** is on by default: photos are resized to at most 2400 pixels on the longest side and saved as JPEG at 85% quality. Change **Longest side (pixels)** to any whole number from 1 to 12000. Smaller photos are not enlarged. Optimized photos replace the original; minijour does not keep a second copy.
+
+Turn optimization off to keep original file bytes, dimensions, format, and metadata. JPEG, PNG, WebP, GIF, AVIF, HEIC, HEIF, TIFF, and BMP files are supported, up to 30 MB each. Preview support depends on your browser; an original it cannot display has a **Download photo** link. Some browsers cannot optimize HEIC or other formats; turn optimization off to store those originals.
+
+These preferences apply only to newly added photos on this device. Existing photos stay unchanged. The preferences are not synced or included in backups. Cloud sync and ZIP backups preserve the stored photo bytes.
+
+### Clean up unused photos
 
 Removing a photo link from Markdown keeps its file available for undo. Choose **Settings → Clean up unused photos** to review the number of unused photos and their size. Nothing is removed until you choose **Permanently delete photos**; **Cancel** keeps them.
 
@@ -79,14 +87,14 @@ Update minijour on all devices before using permanent cleanup. Older app version
 Choose **Download backup** to save a ZIP containing:
 
 - `journal.md`: dates with content and their text as ordinary Markdown.
-- `photos/`: JPEG attachments referenced by the Markdown.
+- `photos/`: photo attachments referenced by the Markdown, in their stored formats.
 - `minijour/`: backup format metadata, Automerge text history for restore and future merging, plus permanent photo deletion records when present. Unsaved drafts are excluded.
 
 Only photos referenced in the current Markdown are included; exporting does not clean up storage. Images referenced only by older editing history are omitted.
 
 Choose **Restore backup** and select the entire ZIP. Restore combines entries with the current journal instead of replacing it. Permanent photo deletions in backups are kept when restoring. Backups from older versions remain supported. Backups contain private content and history. Restore accepts up to 250 MB compressed / 500 MB expanded.
 
-Photos are resized to at most 2400 pixels on the longest side and converted to JPEG; camera originals are not retained. Exports can be read in other Markdown editors, but edits to the exported file do not sync back to minijour.
+Exports can be read in other Markdown editors, but edits to the exported file do not sync back to minijour.
 
 ## Browser support
 

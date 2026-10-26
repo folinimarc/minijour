@@ -16,6 +16,7 @@ import { SyncEngine } from './sync/engine';
 import { JournalView } from './ui/journal-view';
 import { setupDateNavigation } from './ui/date-navigation';
 import { PhotoUrls, preparePhoto } from './ui/photos';
+import { loadPhotoOptions, setupPhotoSettings } from './ui/photo-settings';
 import { mountShell } from './ui/shell';
 import { renderStorageStatus, storageStatus } from './ui/storage-status';
 import './style.css';
@@ -53,6 +54,7 @@ async function start(): Promise<void> {
   let photoTarget: { date: string; anchor: A.Cursor; head: A.Cursor } | undefined;
 
   await journal.load();
+  await setupPhotoSettings(ui, local, notify);
   const afterSave = protectStorage(local);
   const bannerConnection = await setupStorageBanner(ui, local, providers.length > 0, notify);
   const view = new JournalView(ui.journal, journal, urls, {
@@ -177,12 +179,17 @@ async function start(): Promise<void> {
     ui.dialog.append(ui.notice); ui.dialog.showModal();
   };
   ui.statusButton.onclick = () => { ui.settingsButton.click(); ui.dialog.scrollTop = 0; };
-  ui.closeSettings.onclick = () => ui.dialog.close();
+  // Return to writing immediately; a queued close event must not steal later focus.
+  const closeSettings = () => {
+    ui.dialog.close(); document.body.append(ui.notice);
+    editors.get(view.activeDate)?.view.focus();
+  };
+  ui.closeSettings.onclick = closeSettings;
+  ui.dialog.oncancel = event => { event.preventDefault(); closeSettings(); };
   ui.dialog.addEventListener('click', event => { if (event.target === ui.dialog && event.clientX) {
     const box = ui.dialog.getBoundingClientRect();
-    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) ui.dialog.close();
+    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeSettings();
   } });
-  ui.dialog.addEventListener('close', () => { document.body.append(ui.notice); editors.get(view.activeDate)?.view.focus(); });
   ui.export.onclick = () => { void (async () => {
     ui.export.disabled = true;
     try {
@@ -233,7 +240,7 @@ async function start(): Promise<void> {
     if (!file || !photoTarget) return;
     ui.photoButton.disabled = true;
     try {
-      const photo = await preparePhoto(file);
+      const photo = await preparePhoto(file, await loadPhotoOptions(local));
       await local.savePhoto(photo.name, photo.blob);
       const editor = editors.get(photoTarget.date)!;
       const anchor = A.getCursorPosition(editor.doc, ['text'], photoTarget.anchor);

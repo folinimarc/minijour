@@ -20,9 +20,16 @@ test('uses a compact clickable status icon on a narrow screen and explains it in
   await expect(page.locator('#cloud-status')).toContainText('Saved on this device only');
   expect(await page.locator('#cloud-status-icon').innerHTML()).toBe(await page.locator('#status-icon').innerHTML());
   await page.screenshot({ path: 'test-results/storage-status-mobile.png' });
-  await page.getByRole('button', { name: 'Close settings' }).click();
-  await button.focus(); await page.keyboard.press('Enter');
+  // Focus another control before the browser dispatches the queued close event.
+  await page.evaluate(() => {
+    document.querySelector<HTMLButtonElement>('#close-settings')!.click();
+    document.querySelector<HTMLButtonElement>('#status-button')!.focus();
+  });
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeHidden();
+  await expect(page.locator('.cm-content')).toBeFocused();
 });
 
 test('shows a device warning when local saving fails', async ({ page }) => {

@@ -6,6 +6,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Changed
 
+- Add device-local photo preferences: choose the resize limit for optimized JPEGs, or keep original files unchanged. Sync, backups, previews, and cleanup support the original formats.
 - Batch local saves and encrypted cloud sync after 1.5 seconds without editing. Failed local saves retry after 10 seconds; new edits use the normal pause again. There is no recurring local-save check.
 - Avoid serializing the full day on each keystroke. Edits made during a save remain pending for a later batch, and slow cloud requests do not block local saves or trigger immediate extra sync rounds.
 - Show when edits are waiting to save; explicit sync and backgrounding attempt to save pending edits immediately.
@@ -15,6 +16,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Fixed
 
+- Hide today's delete button in the date sidebar, including after midnight rollover.
+- Return focus to writing when settings closes without overriding later keyboard navigation.
 - Keep photo preview space stable during loading and scrolling by using editor block decorations and frames with the image's aspect ratio.
 - Keep spacing around date dividers consistent when sections expand or collapse.
 

@@ -7,6 +7,19 @@ test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-25T12:00:00Z') });
 });
 
+test('omits today’s delete button and updates the buttons when the local date changes', async ({ page }) => {
+  await openJournal(page);
+  await restoreDays(page, { [TODAY]: 'Today’s memory.', '2026-10-26': 'Tomorrow’s plan.', '2020-02-29': 'An older memory.' });
+  await page.getByRole('button', { name: 'Dates', exact: true }).click();
+  await expect(page.getByRole('button', { name: `Delete entry for ${TODAY}`, exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete entry for 2026-10-26', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete entry for 2020-02-29', exact: true })).toBeVisible();
+  await page.clock.setSystemTime(new Date('2026-10-26T12:00:00Z'));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page.getByRole('button', { name: 'Delete entry for 2026-10-26', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: `Delete entry for ${TODAY}`, exact: true })).toBeVisible();
+});
+
 test('opens only today and collapses other entries when navigating through the date drawer', async ({ page, context }) => {
   await openJournal(page);
   const dates = Array.from({ length: 25 }, (_, index) => `2026-10-${String(25 - index).padStart(2, '0')}`);

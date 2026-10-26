@@ -10,7 +10,8 @@ export function setupDateNavigation(
   let rendered = '';
   const refresh = () => {
     const dates = view.dates;
-    const key = dates.join(',');
+    const today = localDate();
+    const key = `${today}:${dates.join(',')}`;
     if (key !== rendered) {
       rendered = key;
       const rows = dates.map(date => {
@@ -18,15 +19,18 @@ export function setupDateNavigation(
         const link = document.createElement('button');
         link.className = 'date-link'; link.textContent = date; link.value = date;
         link.onclick = () => { ui.dateSidebar.close(); view.openDate(date); };
+        row.append(link);
+        if (date === today) return row;
         const remove = document.createElement('button');
         remove.className = 'icon-button delete-date'; remove.innerHTML = icon('trash');
         remove.setAttribute('aria-label', `Delete entry for ${date}`);
         remove.onclick = () => {
+          if (date === localDate()) return;
           if (!confirm(`Delete the entry for ${date}? Its text will be removed from your journal. Photo files stay until you clean them up through the settings.`)) return;
           remove.disabled = true;
           void view.deleteDate(date).catch(notify).finally(() => { remove.disabled = false; });
         };
-        row.append(link, remove);
+        row.append(remove);
         return row;
       });
       ui.dateList.replaceChildren(...rows);

@@ -60,7 +60,7 @@ dialog::backdrop { background: #30382d35; backdrop-filter: blur(3px); }
 label { display: block; font-size: 12px; margin: 14px 0 7px; }
 input[type=text], input[type=password], input[readonly] { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 11px; font-size: 13px; background: var(--paper); color: var(--ink); }
 input[readonly] { font-size: 11px; }
-input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: var(--paper); color: var(--ink); font-size: 13px; min-width: 0; }
+input[type=date], input[type=number] { border: 1px solid var(--line); border-radius: 6px; padding: 10px; background: var(--paper); color: var(--ink); font-size: 13px; min-width: 0; }
 .button-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 #photo-cleanup-review { scroll-margin-block: 12px; }
 .primary-button, .secondary-button, .text-button { padding: 11px 15px; font-size: 12px; border-radius: 7px; border: 1px solid transparent; }
@@ -103,3 +103,7 @@ input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 1
 
 .checkbox-label { display: flex; align-items: center; gap: 8px; line-height: 1.5; }
 .checkbox-label input { margin: 0; flex-shrink: 0; }
+.photo-size { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.photo-size label { margin: 0; }
+.photo-size input { width: 120px; }
+.photo-size input:disabled { color: var(--muted); }

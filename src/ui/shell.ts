@@ -1,5 +1,6 @@
 import { appRoot } from '../urls';
 import { icon } from './icons';
+import { DEFAULT_PHOTO_OPTIONS, MAX_PHOTO_DIMENSION } from '../domain/photos';
 
 export function mountShell() {
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
@@ -80,7 +81,11 @@ export function mountShell() {
         <div class="button-row"><button id="export-button" class="secondary-button">Download backup</button><button id="restore-button" class="text-button">Restore backup</button></div>
       </section>
       <section class="settings-section settings-small">
-        <h2>Clean up unused photos</h2>
+        <h2>Photos</h2>
+        <label class="checkbox-label"><input id="optimize-photos" type="checkbox" checked disabled /> Optimize new photos</label>
+        <div class="photo-size"><label for="photo-max-dimension">Longest side (pixels)</label>
+          <input id="photo-max-dimension" type="number" min="1" max="${MAX_PHOTO_DIMENSION}" step="1" value="${DEFAULT_PHOTO_OPTIONS.maxDimension}" required disabled /></div>
+        <p id="photo-options-help" class="help">Resize larger photos and save as JPEG at 85% quality. Applies to new photos on this device.</p>
         <p>Removing a photo link does not remove the photo file. Clean up files that no entry uses below.</p>
         <button id="review-photos-button" class="secondary-button">Clean up unused photos</button>
         <div id="photo-cleanup-review" hidden>
@@ -121,6 +126,8 @@ export function mountShell() {
     todayButton: get<HTMLButtonElement>('today-button'), addDateButton: get<HTMLButtonElement>('add-date-button'),
     dateForm: get<HTMLFormElement>('date-form'), entryDate: get<HTMLInputElement>('entry-date'),
     cloudSection: get<HTMLElement>('cloud-section'), providerList: get<HTMLDivElement>('cloud-providers'),
+    optimizePhotos: get<HTMLInputElement>('optimize-photos'), photoMaxDimension: get<HTMLInputElement>('photo-max-dimension'),
+    photoOptionsHelp: get<HTMLParagraphElement>('photo-options-help'),
     reviewPhotos: get<HTMLButtonElement>('review-photos-button'), photoCleanupReview: get<HTMLDivElement>('photo-cleanup-review'),
     photoCleanupSummary: get<HTMLParagraphElement>('photo-cleanup-summary'),
     confirmPhotoCleanup: get<HTMLButtonElement>('confirm-photo-cleanup'), cancelPhotoCleanup: get<HTMLButtonElement>('cancel-photo-cleanup'),

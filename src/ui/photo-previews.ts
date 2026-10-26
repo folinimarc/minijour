@@ -1,6 +1,7 @@
 import { StateEffect, StateField, type EditorState } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
 import type { PhotoUrls } from './photos';
+import { PHOTO_NAME_SOURCE } from '../domain/photos';
 
 export const refreshPhotos = StateEffect.define<void>();
 
@@ -13,6 +14,14 @@ class PhotoWidget extends WidgetType {
     figure.textContent = 'Photo is unavailable or has not downloaded yet.';
     void this.urls.get(this.name).then(photo => {
       if (!photo || !figure.isConnected) return;
+      if (!photo.width || !photo.height) {
+        const download = document.createElement('a');
+        download.href = photo.url; download.download = this.name;
+        download.textContent = 'Download photo';
+        figure.replaceChildren('Preview unavailable on this device. ', download);
+        view.requestMeasure();
+        return;
+      }
       const image = document.createElement('img');
       image.width = photo.width; image.height = photo.height;
       image.alt = 'Journal photo'; image.loading = 'lazy';
@@ -43,7 +52,7 @@ class PhotoWidget extends WidgetType {
 export function photoPreviews(urls: PhotoUrls) {
   const build = (state: EditorState): DecorationSet => {
     const widgets = [];
-    const pattern = /!\[[^\]\n]*\]\(photos\/([a-f0-9-]{36}\.jpg)\)/g;
+    const pattern = new RegExp(`!\\[[^\\]\\n]*\\]\\(photos/(${PHOTO_NAME_SOURCE})\\)`, 'g');
     for (const match of state.doc.toString().matchAll(pattern)) {
       widgets.push(Decoration.widget({ widget: new PhotoWidget(match[1], urls, urls.version), block: true, side: 1 })
         .range(match.index! + match[0].length));

@@ -1,12 +1,17 @@
 import type { LocalStore } from '../storage/local';
+import { DEFAULT_PHOTO_OPTIONS, isPhotoOptions, photoExtension, type PhotoOptions } from '../domain/photos';
 
-/** Resize camera images so a journal doesn't accumulate full camera originals. */
-export async function preparePhoto(file: File): Promise<{ name: string; blob: Blob }> {
-  if (!file.type.startsWith('image/')) throw new Error('Choose an image file.');
+/** Optimize new photos or retain the original bytes, according to device preferences. */
+export async function preparePhoto(file: File, options: PhotoOptions = DEFAULT_PHOTO_OPTIONS): Promise<{ name: string; blob: Blob }> {
+  if (!isPhotoOptions(options)) throw new Error('Choose a valid longest side for photos.');
+  const extension = photoExtension(file);
   if (file.size > 30 * 1024 * 1024) throw new Error('Choose a photo smaller than 30 MB.');
-  const image = await createImageBitmap(file);
+  if (!options.optimize) return { name: `${crypto.randomUUID()}.${extension}`, blob: file };
+  let image: ImageBitmap;
+  try { image = await createImageBitmap(file); }
+  catch { throw new Error('This browser cannot optimize this photo. Turn off Optimize new photos to keep the original file.'); }
   try {
-    const scale = Math.min(1, 2400 / Math.max(image.width, image.height));
+    const scale = Math.min(1, options.maxDimension / Math.max(image.width, image.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(image.width * scale));
     canvas.height = Math.max(1, Math.round(image.height * scale));
@@ -24,10 +29,10 @@ export async function preparePhoto(file: File): Promise<{ name: string; blob: Bl
 
 /** Object URLs are local display handles, never stored in Markdown or cloud storage. */
 export class PhotoUrls {
-  private urls = new Map<string, { url: string; width: number; height: number }>();
+  private urls = new Map<string, { url: string; width?: number; height?: number }>();
   version = 0;
   constructor(private local: LocalStore) {}
-  async get(name: string): Promise<{ url: string; width: number; height: number } | undefined> {
+  async get(name: string): Promise<{ url: string; width?: number; height?: number } | undefined> {
     const version = this.version;
     const existing = this.urls.get(name);
     if (existing) return existing;
@@ -35,9 +40,12 @@ export class PhotoUrls {
     if (!photo) return;
     // Know the dimensions before displaying the image so decoding/lazy loading
     // cannot replace a short placeholder with a screen-height photo later.
-    const bitmap = await createImageBitmap(photo);
-    const { width, height } = bitmap;
-    bitmap.close();
+    let width: number | undefined, height: number | undefined;
+    try {
+      const bitmap = await createImageBitmap(photo);
+      width = bitmap.width; height = bitmap.height;
+      bitmap.close();
+    } catch { /* Keep an original downloadable even when this browser cannot decode it. */ }
     if (version !== this.version) return;
     // Another thumbnail may have completed the same lookup while we awaited IDB.
     const preview = this.urls.get(name) ?? { url: URL.createObjectURL(photo), width, height };
