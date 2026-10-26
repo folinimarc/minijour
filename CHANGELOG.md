@@ -4,6 +4,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+## 0.4.0 - 2026-10-26
+
 ### Changed
 
 - Sync photo optimization preferences with the encrypted journal and include them in backups. Settings explains when these preferences sync across devices.

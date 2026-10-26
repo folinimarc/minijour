@@ -14,7 +14,7 @@ During initial development:
 
 After 1.0, use patch releases for compatible fixes, minor releases for compatible features, and major releases for breaking changes. Internal refactoring alone does not require a major release. Choose versions manually and keep release notes useful to users.
 
-Compatibility includes stored journals, Dropbox documents, backups, and older installed PWAs. During 0.x, obsolete development migration paths may be removed; document that in the changelog. Preserve current journal data when refactoring. Storage-format versions are separate: routine updates must not rename `minijour-v1`. Test migrations and interoperability before changing schemas.
+During 0.x development, backward compatibility is not a release requirement. Storage formats may change as the app evolves. Application, database, cloud, and backup formats have separate versions; ordinary refactoring should not change stored data.
 
 Keep `"private": true` in `package.json`. It prevents accidental npm publication and does not control GitHub visibility. Distribution is a static site and release archives, not an npm package.
 
