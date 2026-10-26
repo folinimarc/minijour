@@ -12,7 +12,8 @@ test('keeps emoji replacements, deletion, undo, redo, and multiline paste consis
   await expect(content).toHaveText('A🚀B café');
   await page.keyboard.press('ControlOrMeta+z');
   await expect(content).toHaveText('A🙂B café');
-  await page.keyboard.press('ControlOrMeta+Shift+z');
+  // Shift+Z must send an uppercase key; lowercase z can match Undo on Linux.
+  await page.keyboard.press('ControlOrMeta+Shift+Z');
   await expect(content).toHaveText('A🚀B café');
   await page.keyboard.press('Home');
   await page.keyboard.press('ArrowRight');
