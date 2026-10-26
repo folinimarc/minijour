@@ -1,6 +1,7 @@
 import { journalUrl } from '../urls';
 import type { LocalStore } from '../storage/local';
 import type { VaultStorage, RemoteFile } from './cloud';
+import { MissingRemoteFile } from './cloud';
 import type { CloudProvider } from './provider';
 
 type Connection = {
@@ -168,11 +169,15 @@ export class DropboxFiles implements VaultStorage {
   }
 
   async download(path: string): Promise<Uint8Array> {
-    return new Uint8Array(await (await this.request('files/download', { path: ROOT + path })).arrayBuffer());
+    try { return new Uint8Array(await (await this.request('files/download', { path: ROOT + path })).arrayBuffer()); }
+    catch (error) {
+      if (error instanceof MissingPath) throw new MissingRemoteFile(path);
+      throw error;
+    }
   }
 
   async upload(path: string, bytes: Uint8Array): Promise<RemoteFile> {
-    // Every open app has a unique writer path. Only that writer updates it.
+    // The sync engine gives each document snapshot a fresh, immutable path.
     const result = await (await this.request('files/upload', {
       path: ROOT + path, mode: 'overwrite', autorename: false, mute: true,
     }, bytes)).json() as { rev: string };

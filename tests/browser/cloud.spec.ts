@@ -4,6 +4,34 @@ import { openDate, openJournal, addTestPhoto, replaceEntry, storedDates, storedP
 
 test.skip(!process.env.VITE_DROPBOX_APP_KEY, 'This build has no configured Dropbox provider.');
 
+test('refreshes a stale folder listing when a peer consolidates before the encrypted download', async ({ page, context, browser }) => {
+  const mock = new DropboxMock(); await mock.install(context);
+  await openJournal(page);
+  await page.keyboard.insertText('Before consolidation.');
+  await connect(page);
+  const fresh = await browser.newContext({ serviceWorkers: 'block' });
+  try {
+    await mock.install(fresh);
+    let consolidated = false;
+    await fresh.route('https://content.dropboxapi.com/2/files/download', async route => {
+      const args = JSON.parse(route.request().headers()['dropbox-api-arg']);
+      if (!consolidated && args.path.includes('/objects/')) {
+        consolidated = true;
+        await replaceEntry(page, 'After consolidation.');
+        await sync(page);
+      }
+      await route.fallback();
+    });
+    const other = await fresh.newPage();
+    await openJournal(other); await connect(other);
+    expect(consolidated).toBe(true);
+    await expect(other.locator('.cm-content')).toHaveText('After consolidation.');
+    await expect(other.getByRole('status')).toContainText('Saved to Dropbox');
+    await expect(other.getByRole('alert')).toBeHidden();
+    expect([...mock.files.keys()].filter(path => path.includes('/objects/'))).toHaveLength(1);
+  } finally { await fresh.close(); }
+});
+
 test('does not sync blank drafts, and a cleared future entry stays cleared on another device', async ({ page, context, browser }) => {
   const mock = new DropboxMock(); await mock.install(context);
   await openJournal(page); await connect(page);

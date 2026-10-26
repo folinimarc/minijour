@@ -1,4 +1,5 @@
 import type { VaultStorage, RemoteFile } from '../src/sync/cloud';
+import { MissingRemoteFile } from '../src/sync/cloud';
 import type { Journal } from '../src/domain/journal';
 import { createDay } from '../src/domain/day';
 
@@ -23,7 +24,7 @@ export class MemoryCloud implements VaultStorage {
   }
   async download(path: string): Promise<Uint8Array> {
     const file = this.files.get(path);
-    if (!file) throw new Error('Missing remote file');
+    if (!file) throw new MissingRemoteFile(path);
     return file.bytes.slice();
   }
   async upload(path: string, bytes: Uint8Array): Promise<RemoteFile> {

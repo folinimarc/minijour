@@ -94,7 +94,8 @@ it('rebuilds a day when a checkpoint disappears rather than pretending its histo
   const journal = await device();
   const engine = new SyncEngine(journal, cloud);
   await engine.sync();
-  await cloud.remove(removed);
+  // Initial consolidation replaced both seed files with one complete snapshot.
+  await cloud.remove((await cloud.list())[0].path);
   const uploads = cloud.uploads;
   await engine.sync();
   // The missing history still exists locally and must be published again.

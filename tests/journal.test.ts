@@ -176,7 +176,7 @@ describe('Dropbox-shaped file sync', () => {
     await expect(saveConnection(fresh, { appKey: 'other-app', accountId: 'first' })).rejects.toThrow();
   });
 
-  it('merges offline changes and converges without overwriting writers', async () => {
+  it('merges offline changes and consolidates the converged history', async () => {
     const cloud = new MemoryCloud();
     const phone = await device();
     const laptop = await device();
@@ -193,7 +193,7 @@ describe('Dropbox-shaped file sync', () => {
     expect(phone.days.get(DATE)!.text).toBe(laptop.days.get(DATE)!.text);
     expect(phone.days.get(DATE)!.text).toContain('Long morning walk.');
     expect(phone.days.get(DATE)!.text).toContain('Saw a fox.');
-    expect(cloud.files.size).toBe(2);
+    expect(cloud.files.size).toBe(1);
     const uploads = cloud.uploads;
     await new SyncEngine(phone, cloud).sync();
     expect(cloud.uploads).toBe(uploads); // Opening an app doesn't duplicate all days.

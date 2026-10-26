@@ -52,7 +52,8 @@ export class DropboxMock {
         else await route.fulfill({ status: 409, json: { error_summary: 'path_lookup/not_found/.' } });
       } else if (endpoint.endsWith('/download')) {
         const file = this.files.get(args.path);
-        await route.fulfill({ body: file!.bytes, contentType: 'application/octet-stream' });
+        if (file) await route.fulfill({ body: file.bytes, contentType: 'application/octet-stream' });
+        else await route.fulfill({ status: 409, json: { error_summary: 'path/not_found/.' } });
       } else await route.fulfill({ status: 400 });
     });
   }

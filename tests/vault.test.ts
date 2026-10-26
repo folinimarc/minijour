@@ -1,5 +1,6 @@
 import { afterEach, expect, it } from 'vitest';
 import { EncryptedFiles } from '../src/crypto/vault';
+import { MissingRemoteFile } from '../src/sync/cloud';
 import { SyncEngine } from '../src/sync/engine';
 import { Journal } from '../src/domain/journal';
 import { LocalStore } from '../src/storage/local';
@@ -19,6 +20,16 @@ async function device() {
   return journal;
 }
 afterEach(() => journals.splice(0).forEach(journal => { journal.close(); journal.local.close(); }));
+
+it('preserves missing-file errors so sync can refresh after concurrent consolidation', async () => {
+  const cloud = new MemoryCloud();
+  const vault = await EncryptedFiles.create(cloud, PASSWORD);
+  await vault.upload(PATH, bytes('A memory.'));
+  await vault.list();
+  const opaque = [...cloud.files.keys()].find(path => path !== '/vault.json')!;
+  await cloud.remove(opaque);
+  await expect(vault.download(PATH)).rejects.toBeInstanceOf(MissingRemoteFile);
+});
 
 it('encrypts paths and bytes, restores with the password, and uses a fresh nonce on every write', async () => {
   const cloud = new MemoryCloud();

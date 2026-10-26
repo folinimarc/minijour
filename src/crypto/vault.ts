@@ -1,5 +1,6 @@
 import { argon2id } from 'hash-wasm';
 import type { CloudFiles, VaultStorage, RemoteFile } from '../sync/cloud';
+import { MissingRemoteFile } from '../sync/cloud';
 import { PHOTO_NAME_SOURCE } from '../domain/photos';
 
 // Version 1 deliberately fixes the KDF cost. Untrusted cloud metadata cannot
@@ -123,7 +124,7 @@ export class EncryptedFiles implements CloudFiles {
       catch { throw new Error('An encrypted filename could not be verified. Sync stopped; local entries are safe.'); }
       if (!logicalPath.test(path)) throw new Error('Invalid path inside an encrypted filename.');
       // Concurrent uploads of the same immutable photo can produce two opaque
-      // names. Choose one consistently. Day writers always have distinct UUIDs.
+      // names. Choose one consistently. Document snapshots have fresh UUIDs.
       const copies = names.get(path);
       if (copies) { copies.push(file.path); continue; }
       names.set(path, [file.path]);
@@ -137,7 +138,10 @@ export class EncryptedFiles implements CloudFiles {
     const name = this.names.get(path)?.[0];
     if (!name) throw new Error('Encrypted file was not listed. Retry sync.');
     try { return await decrypt(this.key, await this.cloud.download(name), aad(this.header.id, `file:${name}`)); }
-    catch { throw new Error('An encrypted file could not be downloaded or verified. Sync stopped; local entries are safe.'); }
+    catch (error) {
+      if (error instanceof MissingRemoteFile) throw new MissingRemoteFile(path);
+      throw new Error('An encrypted file could not be downloaded or verified. Sync stopped; local entries are safe.');
+    }
   }
 
   async upload(path: string, bytes: Uint8Array): Promise<RemoteFile> {

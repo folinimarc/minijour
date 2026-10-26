@@ -3,6 +3,7 @@ import { isDate, loadDay, type DayDoc } from '../domain/day';
 import { heads, mergeDocuments } from '../domain/documents';
 import type { Journal } from '../domain/journal';
 import type { CloudFiles, RemoteFile } from './cloud';
+import { MissingRemoteFile } from './cloud';
 import { PHOTO_NAME, PHOTO_DELETION_PATH, photoType, decodePhotoDeletions, encodePhotoDeletions } from '../domain/photos';
 import { createPreferences, loadPreferences, type PreferencesDoc } from '../domain/preferences';
 import { downloadInParallel } from './downloads';
@@ -11,10 +12,9 @@ const DAY_PATH = /^\/days\/(\d{4}-\d{2}-\d{2})\/([a-f0-9-]+)\.automerge$/;
 const PREFERENCES_PATH = /^\/preferences\/[a-f0-9-]{36}\.automerge$/;
 
 /**
- * Each running app owns one checkpoint per changed day. Separate writers never
- * overwrite each other's files. A checkpoint includes Automerge's full history,
- * so an offline device can merge later without needing any other device online.
- * Day checkpoints are retained; history compaction is deliberately omitted.
+ * Snapshots contain full Automerge history and are never rewritten. Publish a
+ * replacement before removing only the snapshots included in that history.
+ * Concurrent uploads remain for a later round; offline devices can still merge.
  */
 export class SyncEngine {
   private cache = new Map<string, { revision: string; bytes: Uint8Array; doc?: DayDoc; preferences?: PreferencesDoc }>();
@@ -25,7 +25,6 @@ export class SyncEngine {
   constructor(
     private journal: Journal,
     private cloud: CloudFiles,
-    private writer = crypto.randomUUID(),
   ) {}
 
   sync(): Promise<void> {
@@ -36,7 +35,13 @@ export class SyncEngine {
     this.running = (async () => {
       do {
         this.rerun = false;
-        await this.round();
+        try { await this.round(); }
+        catch (error) {
+          if (!(error instanceof MissingRemoteFile)) throw error;
+          // A peer can consolidate between listing and downloading. Refresh
+          // once, after the download queue has drained; other failures surface.
+          await this.round();
+        }
       } while (this.rerun);
     })().finally(() => { this.running = undefined; });
     return this.running;
@@ -85,7 +90,7 @@ export class SyncEngine {
     for (const date of this.dayCache.keys()) if (!checkpoints.has(date)) this.dayCache.delete(date);
 
     // Download independently, then decode and merge in the existing order.
-    // One shared queue keeps the limit at four across all days and writers.
+    // One shared queue keeps the limit at four across all day snapshots.
     await downloadInParallel([...checkpoints.values()].flat(), file => this.read(file));
 
     // Pull first. Merging is synchronous; edits made during network requests are
@@ -135,21 +140,34 @@ export class SyncEngine {
 
     for (const [date, doc] of this.journal.days) {
       const remote = remoteDays.get(date);
-      // A fresh app needn't upload the whole journal again. Publish only days
-      // with changes not already represented by the remote checkpoints.
-      if (remote && heads(remote) === heads(doc)) continue;
+      // Publish changed days or consolidate several snapshots into one. An
+      // unchanged day already represented by one snapshot needs no upload.
+      const previous = checkpoints.get(date) ?? [];
+      if (remote && heads(remote) === heads(doc) && previous.length === 1) continue;
       const checkpoint = A.clone(doc);
       const bytes = A.save(checkpoint);
-      const file = await this.cloud.upload(`/days/${date}/${this.writer}.automerge`, bytes);
+      const file = await this.cloud.upload(`/days/${date}/${crypto.randomUUID()}.automerge`, bytes);
       this.cache.set(file.path, { revision: file.revision, bytes, doc: checkpoint });
+      this.dayCache.set(date, { signature: JSON.stringify([[file.path, file.revision]]), doc: checkpoint });
+      await this.removeSnapshots(previous);
     }
 
     const preferences = this.journal.preferences;
-    if (preferences.photoOptions && heads(preferences) !== heads(remotePreferences)) {
+    if (preferences.photoOptions && (heads(preferences) !== heads(remotePreferences) || preferenceFiles.length !== 1)) {
       const checkpoint = A.clone(preferences);
       const bytes = A.save(checkpoint);
-      const file = await this.cloud.upload(`/preferences/${this.writer}.automerge`, bytes);
+      const file = await this.cloud.upload(`/preferences/${crypto.randomUUID()}.automerge`, bytes);
       this.cache.set(file.path, { revision: file.revision, bytes, preferences: checkpoint });
+      await this.removeSnapshots(preferenceFiles);
+    }
+  }
+
+  private async removeSnapshots(files: RemoteFile[]): Promise<void> {
+    // These immutable paths were read and merged into the uploaded snapshot.
+    // Never use a fresh folder listing here: it could include concurrent edits.
+    for (const file of files) {
+      await this.cloud.remove(file.path);
+      this.cache.delete(file.path);
     }
   }
 

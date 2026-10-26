@@ -14,7 +14,7 @@ Entries appear newest first. Only today starts expanded; select a date heading t
 
 Choose **Dates** beside **Settings** to browse all dates. **Go to today** and **Add date** sit below the title. All dates appear in newest-first order. Selecting a date expands its entry, collapses the others, and moves the cursor there. **Add date** shows a picker for any past or future date; an existing date opens its current entry. Opening the app always returns to today. Daily rollover does not interrupt a past or future date you deliberately opened.
 
-The bin beside a date deletes its current text after confirmation. Today has no bin because its writing surface always remains available; you can clear its text in the editor. Photos remain in storage until you clean them up separately. Deleting or clearing an entry retains its Automerge history for sync, rather than erasing old checkpoints or backups. Concurrent edits can still merge into that date. Clearing text locally keeps its heading and editor for undo. When another device clears or deletes an entry, its heading and sidebar link disappear without reloading, even if you opened that date earlier. If it was your active date, writing returns to today. Today’s empty writing surface remains available.
+The bin beside a date deletes its current text after confirmation. Today has no bin because its writing surface always remains available; you can clear its text in the editor. Photos remain in storage until you clean them up separately. Deleting or clearing an entry retains its earlier text in Automerge history on your devices, in cloud storage, and in ZIP backups. It does not permanently erase that text. Concurrent edits can still merge into that date. Clearing text locally keeps its heading and editor for undo. When another device clears or deletes an entry, its heading and sidebar link disappear without reloading, even if you opened that date earlier. If it was your active date, writing returns to today. Today’s empty writing surface remains available.
 
 ## Install
 
@@ -35,6 +35,8 @@ Settings lists the cloud providers available on the website you use. Dropbox is 
 The status icon beside **Dates** opens settings, where the same icon has a short explanation. A device with a check means saved on this device only; a cloud with a check means synced. Cloud arrows indicate syncing or waiting to sync. A cloud exclamation means locked, offline, unavailable, or a sync error; settings gives the reason. Unsaved edits use a plain device icon, and a local save failure uses a device exclamation. A checkmark is shown only after the current edits have been saved.
 
 If no cloud providers are available, settings explains that cloud sync is unavailable and offers local backups. You can keep writing offline and downloading ZIP backups.
+
+Cloud sync automatically consolidates redundant text and photo preference snapshots. This normally leaves one snapshot per day and one for preferences, while retaining their editing history. Photos are removed only through explicit cleanup.
 
 Unlocking combines local entries with the journal in your Dropbox app folder. Sync runs after edits settle, when opening/returning online, and every 30 seconds while visible. Check the saved status before switching devices if you need your latest edit immediately. Uploads cannot be guaranteed while the app is closed or suspended.
 

@@ -4,6 +4,14 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+### Changed
+
+- Automatically consolidate cloud text and photo preference snapshots after a replacement uploads successfully. Keep editing history, including cleared entries, and leave photo removal under explicit cleanup.
+
+### Fixed
+
+- Refresh the cloud listing once when another device removes a snapshot during download.
+
 ## 0.4.1 - 2026-10-26
 
 ### Fixed
