@@ -4,6 +4,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+## 0.3.0 - 2026-10-26
+
 ### Changed
 
 - Simplify application setup into focused UI modules and add a shorter developer guide with a separate architecture reference.
