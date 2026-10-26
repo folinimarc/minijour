@@ -10,6 +10,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 - Avoid serializing the full day on each keystroke. Edits made during a save remain pending for a later batch, and slow cloud requests do not block local saves or trigger immediate extra sync rounds.
 - Show when edits are waiting to save; explicit sync and backgrounding attempt to save pending edits immediately.
 - Keep automatic startup, reconnection, and periodic cloud sync behind the same editing pause. Recheck the pause before starting cloud upload if typing resumes during a local save.
+- Reuse decoded cloud checkpoints and merged remote days within an open session. Unchanged sync rounds avoid decoding and merging their history again; revised, added, or removed checkpoints refresh the affected day.
 
 ## 0.2.1 - 2026-10-25
 

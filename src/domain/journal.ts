@@ -48,7 +48,10 @@ export class Journal {
 
   private accept(date: string, incoming: DayDoc, origin: ChangeOrigin = 'remote', needsSave = false): boolean {
     const previous = this.days.get(date);
-    const next = previous ? mergeDays(previous, incoming) : incoming;
+    // Compare the document versions, not the shared backend's known history:
+    // an editor can hold an older view of a backend with newer changes in it.
+    if (previous && heads(previous) === heads(incoming)) return false;
+    const next = previous ? mergeDays(previous, incoming) : A.clone(incoming);
     if (previous && heads(previous) === heads(next)) return false;
     this.days.set(date, next);
     if (needsSave) this.unsaved.set(date, ++this.revision);
@@ -80,8 +83,15 @@ export class Journal {
   }
 
   async merge(date: string, bytes: Uint8Array, origin: ChangeOrigin = 'remote'): Promise<void> {
+    await this.mergeDoc(date, loadDay(bytes), origin);
+  }
+
+  /** Sync can reuse a validated, decoded checkpoint without serializing it again. */
+  async mergeDoc(date: string, doc: DayDoc, origin: ChangeOrigin = 'remote'): Promise<void> {
     if (!isDate(date)) throw new Error('Invalid journal date.');
-    if (this.accept(date, loadDay(bytes), origin, true)) await this.flush();
+    const changed = this.accept(date, doc, origin, true);
+    // A previous attempt may have merged successfully but failed to save.
+    if (changed || this.unsaved.has(date)) await this.flush();
   }
 
   async flush(): Promise<void> {

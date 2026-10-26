@@ -31,6 +31,19 @@ afterEach(() => {
 });
 
 describe('Automerge journal model', () => {
+  it('stages successive editor versions even when their older views share Automerge internals', async () => {
+    const journal = await device();
+    const first = editDay(journal.days.get(DATE)!, 'First words.');
+    journal.stage(DATE, first);
+    const second = editDay(journal.days.get(DATE)!, 'First words. More words.');
+    journal.stage(DATE, second);
+    expect(journal.days.get(DATE)!.text).toBe('First words. More words.');
+    await journal.flush();
+    expect((await journal.local.days()).get(DATE)).toBeDefined();
+    const stored = A.load<{ text: string }>((await journal.local.days()).get(DATE)!);
+    expect(stored.text).toBe('First words. More words.');
+  });
+
   it('holds multiple edits in memory and writes only changed dates when flushed', async () => {
     const journal = await device();
     const save = vi.spyOn(journal.local, 'saveDay');

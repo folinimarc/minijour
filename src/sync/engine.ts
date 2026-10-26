@@ -13,7 +13,8 @@ const DAY_PATH = /^\/days\/(\d{4}-\d{2}-\d{2})\/([a-f0-9-]+)\.automerge$/;
  * We retain checkpoints: deletion/garbage collection is intentionally omitted.
  */
 export class SyncEngine {
-  private cache = new Map<string, { revision: string; bytes: Uint8Array }>();
+  private cache = new Map<string, { revision: string; bytes: Uint8Array; doc?: DayDoc }>();
+  private dayCache = new Map<string, { signature: string; doc: DayDoc }>();
   private running?: Promise<void>;
   private rerun = false;
 
@@ -42,6 +43,8 @@ export class SyncEngine {
 
   private async round(upload = true): Promise<void> {
     const files = await this.cloud.list();
+    const listed = new Set(files.map(file => file.path));
+    for (const path of this.cache.keys()) if (!listed.has(path)) this.cache.delete(path);
     const remoteDeleted = new Set<string>();
     // Read deletion records before transferring any photo. Deletion wins over
     // old offline references, restored backups, and in-flight stale uploads.
@@ -59,17 +62,24 @@ export class SyncEngine {
     }
     await this.journal.deletePhotos(remoteDeleted);
     const remoteDays = new Map<string, DayDoc>();
-
-    // Pull first. Merging is synchronous; edits made during network requests are
-    // merged with the latest in-memory copy rather than replacing the editor.
+    const checkpoints = new Map<string, RemoteFile[]>();
     for (const file of files) {
       const match = DAY_PATH.exec(file.path);
       if (!match || !isDate(match[1])) continue;
-      const bytes = await this.read(file);
-      const incoming = loadDay(bytes);
-      const previous = remoteDays.get(match[1]);
-      remoteDays.set(match[1], previous ? mergeDays(previous, incoming) : incoming);
-      await this.journal.merge(match[1], bytes);
+      const group = checkpoints.get(match[1]) ?? [];
+      group.push(file);
+      checkpoints.set(match[1], group);
+    }
+    for (const date of this.dayCache.keys()) if (!checkpoints.has(date)) this.dayCache.delete(date);
+
+    // Pull first. Merging is synchronous; edits made during network requests are
+    // merged with the latest in-memory copy rather than replacing the editor.
+    for (const [date, group] of checkpoints) {
+      const doc = await this.remoteDay(date, group);
+      remoteDays.set(date, doc);
+      // Always offer the cached result: local typing and failed saves may have
+      // changed since the last round. Journal cheaply skips identical versions.
+      await this.journal.mergeDoc(date, doc);
     }
 
     const deleted = await this.journal.local.photoDeletions();
@@ -109,10 +119,30 @@ export class SyncEngine {
       // A fresh app needn't upload the whole journal again. Publish only days
       // with changes not already represented by the remote checkpoints.
       if (remote && heads(remote) === heads(doc)) continue;
-      const bytes = A.save(doc);
+      const checkpoint = A.clone(doc);
+      const bytes = A.save(checkpoint);
       const file = await this.cloud.upload(`/days/${date}/${this.writer}.automerge`, bytes);
-      this.cache.set(file.path, { revision: file.revision, bytes });
+      this.cache.set(file.path, { revision: file.revision, bytes, doc: checkpoint });
     }
+  }
+
+  private async remoteDay(date: string, files: RemoteFile[]): Promise<DayDoc> {
+    files.sort((a, b) => a.path.localeCompare(b.path));
+    const signature = JSON.stringify(files.map(file => [file.path, file.revision]));
+    const cached = this.dayCache.get(date);
+    if (cached?.signature === signature) return cached.doc;
+    let doc: DayDoc | undefined;
+    // Rebuild only this day when its checkpoint set changes. In particular,
+    // removed files must not remain in the cached remote history.
+    for (const file of files) {
+      const bytes = await this.read(file);
+      const checkpoint = this.cache.get(file.path)!;
+      try { checkpoint.doc ??= loadDay(bytes); }
+      catch (error) { this.cache.delete(file.path); throw error; }
+      doc = doc ? mergeDays(doc, checkpoint.doc) : checkpoint.doc;
+    }
+    this.dayCache.set(date, { signature, doc: doc! });
+    return doc!;
   }
 
   private async read(file: RemoteFile): Promise<Uint8Array> {
