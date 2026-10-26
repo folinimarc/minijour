@@ -5,6 +5,7 @@ import type { Journal } from '../domain/journal';
 import type { CloudFiles, RemoteFile } from './cloud';
 import { PHOTO_NAME, PHOTO_DELETION_PATH, photoType, decodePhotoDeletions, encodePhotoDeletions } from '../domain/photos';
 import { createPreferences, loadPreferences, type PreferencesDoc } from '../domain/preferences';
+import { downloadInParallel } from './downloads';
 
 const DAY_PATH = /^\/days\/(\d{4}-\d{2}-\d{2})\/([a-f0-9-]+)\.automerge$/;
 const PREFERENCES_PATH = /^\/preferences\/[a-f0-9-]{36}\.automerge$/;
@@ -48,8 +49,9 @@ export class SyncEngine {
     let remotePreferences = createPreferences();
     // Fetch preferences first, so a newly connected device adopts the stored
     // photo policy before downloading the rest of its journal.
-    for (const file of files) {
-      if (!PREFERENCES_PATH.test(file.path)) continue;
+    const preferenceFiles = files.filter(file => PREFERENCES_PATH.test(file.path));
+    await downloadInParallel(preferenceFiles, file => this.read(file));
+    for (const file of preferenceFiles) {
       const bytes = await this.read(file);
       const checkpoint = this.cache.get(file.path)!;
       try { checkpoint.preferences ??= loadPreferences(bytes); }
@@ -60,9 +62,10 @@ export class SyncEngine {
     const remoteDeleted = new Set<string>();
     // Read deletion records before transferring any photo. Deletion wins over
     // old offline references, restored backups, and in-flight stale uploads.
-    for (const file of files) {
-      const match = PHOTO_DELETION_PATH.exec(file.path);
-      if (!match) continue;
+    const deletionFiles = files.filter(file => PHOTO_DELETION_PATH.test(file.path));
+    await downloadInParallel(deletionFiles, file => this.read(file));
+    for (const file of deletionFiles) {
+      const match = PHOTO_DELETION_PATH.exec(file.path)!;
       const bytes = await this.read(file);
       if (bytes.length > 1024) throw new Error('Invalid photo deletion record.');
       const names = decodePhotoDeletions(bytes);
@@ -80,6 +83,10 @@ export class SyncEngine {
       checkpoints.set(match[1], group);
     }
     for (const date of this.dayCache.keys()) if (!checkpoints.has(date)) this.dayCache.delete(date);
+
+    // Download independently, then decode and merge in the existing order.
+    // One shared queue keeps the limit at four across all days and writers.
+    await downloadInParallel([...checkpoints.values()].flat(), file => this.read(file));
 
     // Pull first. Merging is synchronous; edits made during network requests are
     // merged with the latest in-memory copy rather than replacing the editor.
@@ -103,13 +110,19 @@ export class SyncEngine {
     const remotePhotos = new Set(files.filter(file => file.path.startsWith('/photos/'))
       .map(file => file.path.slice('/photos/'.length)).filter(name => PHOTO_NAME.test(name)));
     let photosChanged = false;
-    for (const name of remotePhotos) {
-      if ((await this.journal.local.photoDeletions()).has(name)) continue;
-      if (await this.journal.local.photo(name)) continue;
-      const bytes = await this.cloud.download(`/photos/${name}`);
-      photosChanged = await this.journal.local.savePhoto(name, new Blob([new Uint8Array(bytes)], { type: photoType(name) })) || photosChanged;
+    try {
+      await downloadInParallel([...remotePhotos], async name => {
+        if ((await this.journal.local.photoDeletions()).has(name)) return;
+        if (await this.journal.local.photo(name)) return;
+        const bytes = await this.cloud.download(`/photos/${name}`);
+        // Persist each photo immediately rather than retaining a whole batch.
+        const saved = await this.journal.local.savePhoto(name, new Blob([new Uint8Array(bytes)], { type: photoType(name) }));
+        if (saved) photosChanged = true;
+      });
+    } finally {
+      // Successful downloads remain usable even if another photo failed.
+      if (photosChanged) this.journal.photosChanged();
     }
-    if (photosChanged) this.journal.photosChanged();
 
     // Upload photos before documents that might reference them. Photos have
     // unique immutable names and do not need CRDT merging.

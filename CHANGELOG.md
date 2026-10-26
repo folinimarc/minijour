@@ -4,6 +4,12 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+## 0.4.1 - 2026-10-26
+
+### Fixed
+
+- Speed up cloud downloads by fetching up to four files at a time. Keep document merges and photo deletions ordered, reuse successful downloads after failures, and show photos that finished downloading even if another request failed.
+
 ## 0.4.0 - 2026-10-26
 
 ### Changed
