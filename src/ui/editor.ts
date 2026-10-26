@@ -1,58 +1,14 @@
-import { Annotation, EditorState, StateEffect, Transaction } from '@codemirror/state';
-import { EditorView, Decoration, ViewPlugin, WidgetType, keymap, placeholder, type DecorationSet } from '@codemirror/view';
+import { Annotation, EditorState, Transaction } from '@codemirror/state';
+import { EditorView, keymap, placeholder } from '@codemirror/view';
 import { markdown } from '@codemirror/lang-markdown';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { PhotoUrls } from './photos';
+import { photoPreviews, refreshPhotos } from './photo-previews';
 import { editDay, type DayDoc } from '../domain/day';
 
 const externalChange = Annotation.define<boolean>();
-const refreshPhotos = StateEffect.define<void>();
-
-class PhotoWidget extends WidgetType {
-  constructor(private name: string, private urls: PhotoUrls, private version: number) { super(); }
-  eq(other: PhotoWidget): boolean { return other.name === this.name && other.version === this.version; }
-  toDOM(): HTMLElement {
-    const figure = document.createElement('span');
-    figure.className = 'photo-preview';
-    figure.textContent = 'Photo is unavailable or has not downloaded yet.';
-    void this.urls.get(this.name).then(url => {
-      if (!url) return;
-      const image = document.createElement('img');
-      image.src = url;
-      image.alt = 'Journal photo';
-      image.loading = 'lazy';
-      figure.replaceChildren(image);
-    }).catch(() => { figure.textContent = 'Could not load this photo.'; });
-    return figure;
-  }
-}
-
-function photoPreviews(urls: PhotoUrls) {
-  return ViewPlugin.fromClass(class {
-    decorations: DecorationSet;
-    constructor(view: EditorView) { this.decorations = this.build(view); }
-    update(update: { view: EditorView; docChanged: boolean; viewportChanged: boolean; transactions: readonly { effects: readonly StateEffect<unknown>[] }[] }) {
-      if (update.docChanged || update.viewportChanged || update.transactions.some(tx => tx.effects.some(effect => effect.is(refreshPhotos)))) {
-        this.decorations = this.build(update.view);
-      }
-    }
-    build(view: EditorView): DecorationSet {
-      const widgets = [];
-      const pattern = /!\[[^\]\n]*\]\(photos\/([a-f0-9-]{36}\.jpg)\)/g;
-      for (const { from, to } of view.visibleRanges) {
-        const text = view.state.doc.sliceString(from, to);
-        for (const match of text.matchAll(pattern)) {
-          widgets.push(Decoration.widget({ widget: new PhotoWidget(match[1], urls, urls.version), side: 1 })
-            .range(from + match.index! + match[0].length));
-        }
-      }
-      return Decoration.set(widgets, true);
-    }
-  }, { decorations: instance => instance.decorations });
-}
-
 /** One editor per day, visually joined into one chronological document. */
 export class DayEditor {
   readonly view: EditorView;

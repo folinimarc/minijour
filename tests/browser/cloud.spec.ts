@@ -152,7 +152,7 @@ test('requires matching passwords on setup and keeps local writing available aft
   await page.reload();
   await expect(page.locator('.cm-content')).toBeFocused();
   await page.keyboard.insertText('Writing while cloud access is unavailable.');
-  await expect(page.getByRole('status')).toHaveText('Cloud storage locked');
+  await expect(page.getByRole('status')).toHaveText('Cloud storage unavailable');
   await page.getByRole('button', { name: 'Add a photo', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Choose from device' })).toBeVisible();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();

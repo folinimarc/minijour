@@ -85,7 +85,7 @@ test('keeps the opening cursor visible when a photo finishes loading later', asy
   await page.keyboard.insertText('An earlier line.\n\n'.repeat(45));
   await addTestPhoto(page);
   await page.keyboard.insertText('\nContinue below this photo.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
   // Hold only journal photo loads until after the opening scroll has happened.
   await page.addInitScript(() => {
     const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!;
@@ -123,7 +123,7 @@ test('explains local storage, opens settings, and remembers banner dismissal acr
   await mockStorage(page);
   await openJournal(page); await page.keyboard.insertText('My journal still saves.');
   const banner = page.getByRole('complementary', { name: 'Local journal storage' });
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
   await expect(banner).toContainText('clearing browser data can remove it');
   await expect(page.getByRole('alert')).toBeHidden();
   await banner.getByRole('button', { name: 'settings', exact: true }).click();
@@ -139,7 +139,7 @@ test('explains local storage, opens settings, and remembers banner dismissal acr
   await expect(page.locator('.cm-content')).toContainText('My journal still saves.');
   await expect(banner).toBeHidden();
   await page.keyboard.insertText(' More writing.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
   expect(await page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBe('1');
   const other = await context.newPage(); await openJournal(other);
   await expect(other.locator('#storage-banner')).toBeHidden();
@@ -149,7 +149,7 @@ for (const mode of ['granted', 'unsupported', 'error'] as const) {
   test(`keeps ordinary saves working when persistence is ${mode}`, async ({ page }) => {
     await mockStorage(page, mode);
     await openJournal(page); await page.keyboard.insertText('A saved memory.');
-    await expect(page.getByRole('status')).toHaveText('Saved on this device');
+    await expect(page.getByRole('status')).toHaveText('Saved on this device only');
     await expect(page.getByRole('alert')).toBeHidden();
     await page.reload();
     await expect(page.locator('.cm-content')).toContainText('A saved memory.');
@@ -186,6 +186,6 @@ test('does not repeat automatic permission requests when another notice occupied
   await expect(page.getByRole('alert')).toHaveText('An existing message.');
   await page.reload();
   await page.keyboard.insertText(' More writing.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
   expect(await page.evaluate(() => localStorage.getItem('test:persist-calls'))).toBe('1');
 });

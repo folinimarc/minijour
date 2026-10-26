@@ -120,7 +120,7 @@ for (const keepTyping of [false, true]) {
     const date = '2020-02-29';
     await openJournal(page);
     await openDate(page, date); await page.keyboard.insertText('Old memory.');
-    await expect(page.getByRole('status')).toHaveText('Saved on this device');
+    await expect(page.getByRole('status')).toHaveText('Saved on this device only');
     const other = await context.newPage(); await openJournal(other); await openDate(other, date);
     const content = page.locator(`[data-date="${date}"] .cm-content`);
     await content.focus(); await content.dispatchEvent('compositionstart');

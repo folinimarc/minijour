@@ -55,9 +55,11 @@ src/
     cloud-settings.ts Connection, password unlock, and legacy import controls
     storage-banner.ts Local storage advice and remembered dismissal
     shell.ts          Static application markup and element references
+    storage-status.ts Shared status symbols and explanations for header/settings
     journal-view.ts   Date sections, local drafts, collapse state, lazy editors
     date-navigation.ts Date drawer, date picker, and confirmed entry deletion
-    editor.ts         CodeMirror editor and photo previews
+    editor.ts         CodeMirror editor and composition-safe incoming edits
+    photo-previews.ts Stable block decorations and reserved image frames
     photos.ts         Image resizing and local display URLs
   style.css           Journal/editor visual styles
 ```
@@ -95,6 +97,8 @@ Deleting a date asks for confirmation, then clears its text through `Journal.edi
 Sync still fetches and merges all days and photos. Deferring document sync until navigation would require reliable remote indexing and changes to backup and photo-reference checks. Lazy editor creation reduces browser work without changing the storage contract.
 
 The top bar is sticky. On opening, the editor explicitly scrolls its final position into view; delayed photo loads and viewport resizing can repeat that reveal until the first user interaction. Browser scroll restoration is disabled on the journal page. After interaction, incoming sync preserves the person's position.
+
+The header uses a storage-status button instead of wrapping status text. `ui/storage-status.ts` chooses one status for both that button and the explanation in cloud settings. Device/cloud checkmarks require durable local data and, for cloud, a successful sync with no pending changes. Unsaved local edits use a plain device, local failures a device warning, and locked/offline/unavailable cloud access a cloud warning. The header retains a screen-reader live status, accessible button description, and tooltip; the visible explanation is in settings.
 
 `storage/persistence.ts` requests browser storage protection after the first successful edit. It records the attempt in local preferences and does not repeat automatic requests. A refusal or unsupported API does not disable IndexedDB saves. The header reports save and sync status. `ui/storage-banner.ts` shows local-only storage advice after cloud connection lookup, unless a connection exists or the local `local-storage-banner-dismissed` setting is true. Dismissal is written before hiding the banner, and failures leave it visible. The preference is device-local and excluded from ZIPs and sync. Deployments without providers point to downloaded backups instead. Settings explain browser-data loss and offer configured providers. Storage protection never prevents deliberate clearing of browser data.
 
@@ -191,6 +195,8 @@ The unwrapped key is non-exportable in Web Crypto. Optional remember-on-device s
 ### Photos and backups
 
 Photos are resized to at most 2400 pixels on the longest side, converted to JPEG at quality 0.85, and given unique filenames. Camera originals are not retained. Markdown stores relative `photos/…` links, never temporary browser blob URLs. Photos are uploaded before documents that reference them.
+
+`ui/photo-previews.ts` supplies block decorations directly through a CodeMirror state field. Photos change vertical layout, so their decorations cover the whole day's text and are not rebuilt from the changing visible range. CodeMirror still controls which blocks have DOM nodes. Preview dimensions are read from the stored image and held in memory with its object URL. An aspect-ratio frame reserves the display area independently of the image element's loading state. Blocks use padding rather than vertical margins and request a layout measurement after asynchronous changes, following the [CodeMirror decoration contract](https://codemirror.net/docs/ref/#view.Decoration^widget). Missing or permanently deleted images keep their text fallback. Date divider spacing uses the same rule for expanded and collapsed sections.
 
 A downloaded backup ZIP contains:
 

@@ -6,7 +6,7 @@
 
 Choose **Open journal** from the information page, or open `/journal/` directly. Installed apps launch straight into the journal. Today's writing surface is ready, with the cursor and view at the end of its entry. The top bar stays visible while you scroll. Type Markdown; changes save automatically. Dates follow your device's timezone. Daily writing advances to the new date at midnight or when you return after the date changes.
 
-Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have inline previews; their Markdown links remain editable.
+Choose **Add photo**, then **Take a photo** or **Choose from device**. The image is inserted at the remembered cursor position. Photos have previews; their Markdown links remain editable. Large photos are resized to at most 2400 pixels on the longest side and encoded as JPEG at quality 0.85. The original is not retained.
 
 Date headings are managed by the app. Each day has its own editor, so selection and undo history stay within that day. An export joins all days into one Markdown file. Use **Settings** for cloud sync, backups, and installation information.
 
@@ -31,6 +31,8 @@ The app focuses the editor on opening. Browsers control whether that raises the 
 ## Cloud sync
 
 Settings lists the cloud providers available on the website you use. Dropbox is currently supported. Choose **Connect Dropbox**, sign in to your own account, and authorize minijour. Choose a cloud password of at least 12 characters, or enter your existing cloud password. On another device, visit the same site, connect the same account, and unlock with the same cloud password.
+
+The status icon beside **Dates** opens settings, where the same icon has a short explanation. A device with a check means saved on this device only; a cloud with a check means synced. Cloud arrows indicate syncing or waiting to sync. A cloud exclamation means locked, offline, unavailable, or a sync error; settings gives the reason. Unsaved edits use a plain device icon, and a local save failure uses a device exclamation. A checkmark is shown only after the current edits have been saved.
 
 If no cloud providers are available, settings explains that cloud sync is unavailable and offers local backups. You can keep writing offline and downloading ZIP backups.
 

@@ -24,23 +24,29 @@ export async function preparePhoto(file: File): Promise<{ name: string; blob: Bl
 
 /** Object URLs are local display handles, never stored in Markdown or cloud storage. */
 export class PhotoUrls {
-  private urls = new Map<string, string>();
+  private urls = new Map<string, { url: string; width: number; height: number }>();
   version = 0;
   constructor(private local: LocalStore) {}
-  async get(name: string): Promise<string | undefined> {
+  async get(name: string): Promise<{ url: string; width: number; height: number } | undefined> {
     const version = this.version;
     const existing = this.urls.get(name);
     if (existing) return existing;
     const photo = await this.local.photo(name);
-    if (!photo || version !== this.version) return;
+    if (!photo) return;
+    // Know the dimensions before displaying the image so decoding/lazy loading
+    // cannot replace a short placeholder with a screen-height photo later.
+    const bitmap = await createImageBitmap(photo);
+    const { width, height } = bitmap;
+    bitmap.close();
+    if (version !== this.version) return;
     // Another thumbnail may have completed the same lookup while we awaited IDB.
-    const url = this.urls.get(name) ?? URL.createObjectURL(photo);
-    this.urls.set(name, url);
-    return url;
+    const preview = this.urls.get(name) ?? { url: URL.createObjectURL(photo), width, height };
+    this.urls.set(name, preview);
+    return preview;
   }
   clear(): void {
     this.version++;
-    this.urls.forEach(url => URL.revokeObjectURL(url));
+    this.urls.forEach(photo => URL.revokeObjectURL(photo.url));
     this.urls.clear();
   }
 }

@@ -6,8 +6,10 @@ export function mountShell() {
     <header class="topbar">
       <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
       <div class="topbar-right">
-        <span id="status" class="status" role="status"><span class="status-dot"></span><span id="status-text">Opening your journal…</span></span>
         <div class="header-actions">
+          <button id="status-button" class="icon-button status-button" aria-label="Storage status. Open settings" aria-describedby="status" title="Opening your journal…" disabled>
+            <span id="status-icon">${icon('device')}</span><span id="status" class="sr-only" role="status"><span id="status-text">Opening your journal…</span></span>
+          </button>
           <button id="dates-button" class="header-button" aria-expanded="false" aria-controls="date-sidebar" disabled>Dates</button>
           <button id="settings-button" class="header-button" disabled>Settings</button>
         </div>
@@ -47,6 +49,7 @@ export function mountShell() {
       <div class="dialog-header"><h1 id="settings-title">Settings</h1><button id="close-settings" class="icon-button" aria-label="Close settings">${icon('close')}</button></div>
       <section id="cloud-section" class="settings-section">
         <h2>${icon('cloud')}Connect your own cloud</h2>
+        <p id="cloud-status" class="cloud-status" aria-live="polite" aria-atomic="true"><span id="cloud-status-icon">${icon('device')}</span><span id="cloud-status-text">Opening your journal…</span></p>
         <p id="connection-description">Your journal saves on this device, but clearing browser data can remove it. Connect your own cloud account for encrypted backup and sync across your devices.</p>
         <div id="cloud-providers" class="button-row" hidden></div>
         <p class="help">How it works: minijour saves your entries, editing history, and photos encrypted in its own folder in your cloud account. Connect the same account on other devices to keep them in sync. Sync runs while the app is open and your cloud is unlocked.</p>
@@ -99,7 +102,9 @@ export function mountShell() {
     </dialog>`;
   const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   return {
-    journal: get<HTMLElement>('journal'), status: get<HTMLSpanElement>('status'), statusText: get<HTMLSpanElement>('status-text'),
+    journal: get<HTMLElement>('journal'), statusText: get<HTMLSpanElement>('status-text'),
+    statusButton: get<HTMLButtonElement>('status-button'), statusIcon: get<HTMLSpanElement>('status-icon'),
+    cloudStatus: get<HTMLParagraphElement>('cloud-status'), cloudStatusIcon: get<HTMLSpanElement>('cloud-status-icon'), cloudStatusText: get<HTMLSpanElement>('cloud-status-text'),
     storageBanner: get<HTMLElement>('storage-banner'), storageAdvice: get<HTMLSpanElement>('storage-advice'),
     storageSettings: get<HTMLButtonElement>('storage-settings'), dismissStorageBanner: get<HTMLButtonElement>('dismiss-storage-banner'),
     settingsButton: get<HTMLButtonElement>('settings-button'), dialog: get<HTMLDialogElement>('settings-dialog'),

@@ -12,7 +12,7 @@ export async function setupCloudSettings(
   options: {
     busy: () => boolean; activity: (value: boolean) => void;
     change: (engine?: SyncEngine, providerName?: string) => void;
-    connection: (connected: boolean) => void;
+    connection: (connected: boolean, available: boolean) => void;
     sync: () => Promise<void>; requestSync: () => void; notify: (error: unknown) => void;
   },
 ): Promise<void> {
@@ -30,7 +30,7 @@ export async function setupCloudSettings(
   let inspected = false;
   const setWorking = (value: boolean) => { working = value; options.activity(value); };
   const show = () => {
-    options.connection(!!session);
+    options.connection(!!session, inspected);
     ui.providerList.hidden = !!session;
     for (const [entry, button] of buttons) button.disabled = working || !!owner && owner.providerId !== entry.id;
     ui.connected.hidden = !session;

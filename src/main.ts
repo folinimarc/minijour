@@ -17,6 +17,7 @@ import { JournalView } from './ui/journal-view';
 import { setupDateNavigation } from './ui/date-navigation';
 import { PhotoUrls, preparePhoto } from './ui/photos';
 import { mountShell } from './ui/shell';
+import { renderStorageStatus, storageStatus } from './ui/storage-status';
 import './style.css';
 
 const ui = mountShell();
@@ -39,6 +40,7 @@ async function start(): Promise<void> {
   let cleaning = false;
   let cloudWorking = false;
   let cloudConnected = false;
+  let cloudAvailable = false;
   let syncError = false;
   let lastSync: Date | undefined;
   let dirty = true;
@@ -62,19 +64,11 @@ async function start(): Promise<void> {
   try { justConnected = await finishCloudConnection(local, providers); } catch (error) { notify(error); }
 
   function updateStatus(): void {
-    ui.status.classList.toggle('has-error', !!journal.saveError || syncError);
-    ui.status.classList.toggle('is-busy', journal.hasUnsavedChanges || journal.pending > 0 || syncing || cleaning);
-    ui.statusText.textContent = journal.saveError ? 'Could not save on this device'
-      : journal.pending ? 'Saving…'
-      : journal.hasUnsavedChanges ? 'Changes waiting to save…'
-      : cleaning ? 'Saved on device · updating photos…'
-      : syncing ? 'Saved on device · syncing…'
-      : syncError ? 'Saved on device · sync needs attention'
-      : !navigator.onLine ? 'Saved on device · offline'
-      : !cloudConnected ? 'Saved on this device'
-      : !engine ? 'Cloud storage locked'
-      : lastSync && !dirty ? `Saved to ${cloudName}`
-      : 'Saved on device · waiting to sync';
+    renderStorageStatus(ui, storageStatus({
+      saveError: !!journal.saveError, saving: journal.pending > 0, unsaved: journal.hasUnsavedChanges,
+      cleaning, syncing, syncError, connected: cloudConnected, available: cloudAvailable,
+      unlocked: !!engine, cloudWorking, online: navigator.onLine, synced: !!lastSync && !dirty, cloudName,
+    }));
     ui.sync.disabled = syncing || cleaning;
     ui.sync.textContent = syncing ? 'Syncing…' : 'Sync now';
   }
@@ -182,6 +176,7 @@ async function start(): Promise<void> {
     closePhotoMenu();
     ui.dialog.append(ui.notice); ui.dialog.showModal();
   };
+  ui.statusButton.onclick = () => { ui.settingsButton.click(); ui.dialog.scrollTop = 0; };
   ui.closeSettings.onclick = () => ui.dialog.close();
   ui.dialog.addEventListener('click', event => { if (event.target === ui.dialog && event.clientX) {
     const box = ui.dialog.getBoundingClientRect();
@@ -296,6 +291,7 @@ async function start(): Promise<void> {
   });
   ui.datesButton.disabled = false;
   ui.settingsButton.disabled = false;
+  ui.statusButton.disabled = false;
   await setupCloudSettings(ui, journal, providers, {
     busy: () => syncing || cleaning,
     activity: value => { cloudWorking = value; },
@@ -303,8 +299,8 @@ async function start(): Promise<void> {
       engine = next; cloudName = name; syncError = false; lastSync = undefined; dirty = true;
       updateStatus();
     },
-    connection: value => {
-      cloudConnected = value; bannerConnection(value); updateStatus();
+    connection: (value, available) => {
+      cloudConnected = value; cloudAvailable = available; bannerConnection(value); updateStatus();
       view.revealOpening();
     },
     sync, requestSync: scheduleSync, notify,
@@ -315,8 +311,7 @@ async function start(): Promise<void> {
 }
 
 void start().catch(error => {
-  ui.statusText.textContent = 'Could not open your journal';
-  ui.status.classList.add('has-error');
+  renderStorageStatus(ui, { icon: 'device-alert', text: 'Could not open your journal', warning: true });
   ui.journal.setAttribute('aria-busy', 'false');
   ui.photoButton.disabled = true;
   notify(error instanceof Error ? new Error(`${error.message} Try reloading. Your stored data has not been reset.`) : error);

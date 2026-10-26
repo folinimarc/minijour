@@ -11,6 +11,12 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 - Show when edits are waiting to save; explicit sync and backgrounding attempt to save pending edits immediately.
 - Keep automatic startup, reconnection, and periodic cloud sync behind the same editing pause. Recheck the pause before starting cloud upload if typing resumes during a local save.
 - Reuse decoded cloud checkpoints and merged remote days within an open session. Unchanged sync rounds avoid decoding and merging their history again; revised, added, or removed checkpoints refresh the affected day.
+- Replace header save/sync text with a compact status button. The matching icon and explanation appear in cloud settings, including locked, offline, unavailable, and unsaved states.
+
+### Fixed
+
+- Keep photo preview space stable during loading and scrolling by using editor block decorations and frames with the image's aspect ratio.
+- Keep spacing around date dividers consistent when sections expand or collapse.
 
 ## 0.2.1 - 2026-10-25
 

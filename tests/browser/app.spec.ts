@@ -57,7 +57,7 @@ test('prepends the new local day once after midnight', async ({ page }) => {
   await expect(page.locator('.day-heading time')).toHaveText(['2026-10-25', '2026-10-24']);
   await expect(page.locator('.cm-content').first()).toBeFocused();
   await page.keyboard.insertText('Sunday memory.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
   await page.reload();
   await expect(page.locator('.day')).toHaveCount(2);
   await openDate(page, '2026-10-24');
@@ -195,7 +195,7 @@ test('keeps a reviewed photo when another tab adds a reference before confirmati
   await expect(page.locator('#photo-cleanup-summary')).toContainText('1 unused photo');
   const other = await context.newPage(); await openJournal(other);
   await replaceEntry(other, `Keep this reference: ![Photo](photos/${name})`);
-  await expect(other.getByRole('status')).toHaveText('Saved on this device');
+  await expect(other.getByRole('status')).toHaveText('Saved on this device only');
   await page.getByRole('button', { name: 'Permanently delete photos' }).click();
   await expect(page.getByRole('alert')).toContainText('No photos removed');
   expect(await storedPhotos(page)).toEqual([name]);
@@ -211,7 +211,7 @@ test('shows local journaling without provider choices or setup controls when non
   });
   await openJournal(page);
   await page.keyboard.insertText('My local journal.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
   // Browser-entered keys and older tokens must not silently enable a provider.
   await page.evaluate(() => new Promise<void>((resolve, reject) => {
     const open = indexedDB.open('minijour-v1');

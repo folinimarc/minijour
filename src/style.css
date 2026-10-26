@@ -7,10 +7,12 @@ html { scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top) 
 .header-actions { display: flex; align-items: center; gap: 6px; }
 .header-button { min-height: 36px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; font-size: 12px; color: var(--muted); }
 .header-button:hover { color: var(--ink); background: var(--surface); }
-.status { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); letter-spacing: .1px; }
-.status-dot { width: 5px; height: 5px; background: #7b9472; border-radius: 50%; flex-shrink: 0; }
-.status.has-error .status-dot { background: #b27743; }
-.status.is-busy .status-dot { animation: breathe 1s infinite alternate; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.status-button { flex-shrink: 0; }
+.status-button > span:first-child, .cloud-status > span:first-child { display: inline-flex; flex-shrink: 0; }
+.status-button.is-busy svg { animation: breathe 1s infinite alternate; }
+.status-button.has-warning, .cloud-status.has-warning { color: #9b6c38; }
+.cloud-status { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 @keyframes breathe { to { opacity: .3; } }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
 .icon-button:hover { background: var(--line); color: var(--ink); }
@@ -20,8 +22,7 @@ html { scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top) 
 .storage-banner > button { flex-shrink: 0; }
 .storage-banner:not([hidden]) + #journal { margin-top: 36px; }
 .inline-button { display: inline; padding: 0; border: 0; background: transparent; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-.day:not([hidden]) ~ .day:not([hidden]) { border-top: 1px solid var(--line); margin-top: 56px; padding-top: 48px; }
-.day:not([hidden]) ~ .day.collapsed:not([hidden]) { margin-top: 20px; padding-top: 20px; }
+.day:not([hidden]) ~ .day:not([hidden]) { border-top: 1px solid var(--line); margin-top: 32px; padding-top: 32px; }
 .day-heading { font-family: Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 400; letter-spacing: -.7px; margin: 0 0 24px; }
 .day-toggle { display: flex; align-items: center; gap: 18px; width: 100%; padding: 0; border: 0; background: transparent; text-align: left; }
 .day-toggle > svg { width: 14px; height: 14px; color: var(--muted); flex-shrink: 0; transform: rotate(90deg); }
@@ -35,8 +36,9 @@ html { scroll-padding-top: calc(var(--header-height) + env(safe-area-inset-top) 
 .cm-placeholder { color: #a1a397 !important; }
 .cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection { background: #dce4d4 !important; }
 .cm-cursor { border-left-color: var(--accent) !important; }
-.photo-preview { display: block; max-width: 100%; margin: 16px 0 20px; border-radius: 5px; color: var(--muted); font-size: 12px; }
-.photo-preview img { display: block; max-width: 100%; max-height: 560px; border-radius: 5px; object-fit: contain; }
+.photo-preview { display: block; max-width: 100%; padding: 16px 0 20px; color: var(--muted); font-size: 12px; }
+.photo-frame { position: relative; max-width: 100%; }
+.photo-frame img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 5px; object-fit: contain; }
 .photo-tools { position: fixed; bottom: max(28px, env(safe-area-inset-bottom)); right: max(28px, calc((100vw - 1080px) / 2)); z-index: 5; }
 .photo-button { display: inline-flex; gap: 9px; align-items: center; padding: 14px 21px; border: 1px solid #d6dbce; border-radius: 40px; background: var(--surface); box-shadow: 0 3px 18px #333c3407; font-size: 13px; }
 .photo-button:hover { border-color: #9aa992; box-shadow: 0 4px 20px #333c3410; }
@@ -85,8 +87,8 @@ input[type=date] { border: 1px solid var(--line); border-radius: 6px; padding: 1
 @media (max-width: 600px) {
   :root { --header-height: 74px; }
   .topbar { padding-right: 22px; padding-left: 22px; gap: 8px; }
-  .topbar-right { flex-direction: column-reverse; align-items: flex-end; gap: 0; }
-  .status { font-size: 10px; max-width: 180px; line-height: 1.5; }
+  .topbar-right { gap: 0; flex-shrink: 0; }
+  .header-button { white-space: nowrap; }
   #journal { width: calc(100% - 48px); margin-top: 42px; }
   .storage-banner { flex-direction: column; align-items: flex-start; gap: 8px; }
   .day-heading { font-size: 25px; margin-bottom: 22px; }

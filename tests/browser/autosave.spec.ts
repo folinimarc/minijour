@@ -44,7 +44,7 @@ test('batches repeated editing into one durable save after a pause', async ({ pa
   await expect(page.getByRole('status')).toHaveText('Changes waiting to save…');
   await page.clock.runFor(1);
   await expect.poll(() => writes(page)).toBe(1);
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
   expect(await storedText(page)).toBe('A memory to edi');
   await page.clock.runFor(30_000);
   expect(await writes(page)).toBe(1);
@@ -86,7 +86,7 @@ test('retries a failed local save without more typing or a cloud connection', as
   expect(await writes(page)).toBe(0);
   await page.clock.runFor(1);
   await expect.poll(() => storedText(page)).toBe('Keep this memory.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device');
+  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
   await page.clock.runFor(60_000);
   expect(await writes(page)).toBe(1);
 });
