@@ -36,8 +36,7 @@ test('serves a real journal page, root-relative identity, and correct launch/sco
   const launch = new URL(manifest.start_url, manifestUrl);
   expect(launch.href).toBe(new URL('journal/', baseURL!).href);
   expect(new URL(manifest.scope, manifestUrl).href).toBe(baseURL);
-  // Manifest ID resolves against the origin, unlike start_url. It must match
-  // the old root start_url to preserve identity on existing installations.
+  // Manifest ID resolves against the origin, unlike start_url.
   expect(new URL(manifest.id, launch.origin).href).toBe(baseURL);
   await page.goto(launch.href);
   await expect(page.locator('.cm-content')).toBeFocused();
@@ -58,25 +57,6 @@ test('installs from the landing page and opens the journal offline for the first
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Simple, private journaling.');
 });
 
-test('redirects older standalone root launches to writing while allowing the About page', async ({ page }) => {
-  await page.addInitScript(() => {
-    const original = window.matchMedia.bind(window);
-    window.matchMedia = query => query === '(display-mode: standalone)'
-      ? { ...original(query), matches: true } as MediaQueryList : original(query);
-  });
-  await page.goto('./');
-  await expect(page).toHaveURL(/\/journal\/$/);
-  await expect(page.locator('.cm-content')).toBeFocused();
-  await page.getByRole('link', { name: 'About minijour', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Simple, private journaling.');
-});
-
-test('forwards old root OAuth callbacks to the journal and clears callback parameters', async ({ page }) => {
-  await page.goto('./?code=old-callback&state=old-state');
-  await expect(page).toHaveURL(/\/journal\/$/);
-  await expect(page.locator('.cm-content')).toBeVisible();
-  await expect(page.getByRole('alert')).toContainText('started in another tab');
-});
 
 test('keeps the desktop introduction readable and all primary links functional', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -89,9 +69,9 @@ test('keeps the desktop introduction readable and all primary links functional',
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('opens the unchanged database from the former root-page application', async ({ page }) => {
+test('opens existing journal data after visiting the information page', async ({ page }) => {
   await page.goto('./');
-  const history = Array.from(A.save(editDay(createDay('2020-01-01'), 'Saved before the journal moved.')));
+  const history = Array.from(A.save(editDay(createDay('2020-01-01'), 'An existing memory.')));
   await page.evaluate(data => new Promise<void>((resolve, reject) => {
     const open = indexedDB.open('minijour-v1', 1);
     open.onupgradeneeded = () => {
@@ -108,9 +88,9 @@ test('opens the unchanged database from the former root-page application', async
   }), history);
   await page.getByRole('link', { name: 'Open journal' }).click();
   await openDate(page, '2020-01-01');
-  await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toHaveText('Saved before the journal moved.');
+  await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toHaveText('An existing memory.');
   await page.reload();
   await expect(page.locator('[data-date="2020-01-01"] .day-heading time')).toHaveText('2020-01-01');
   await openDate(page, '2020-01-01');
-  await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toHaveText('Saved before the journal moved.');
+  await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toHaveText('An existing memory.');
 });

@@ -8,11 +8,11 @@ type Section = { element: HTMLElement; content: HTMLElement; toggle: HTMLButtonE
 
 /** Date sections and local drafts. Collapsed older days need no editor yet. */
 export class JournalView {
-  readonly editors = new Map<string, DayEditor>();
+  private editors = new Map<string, DayEditor>();
   activeDate = localDate();
   private drafts = new Map<string, DayDoc>();
   private sections = new Map<string, Section>();
-  private expanded = new Map<string, boolean>();
+  private expanded = new Set<string>();
   private opened = new Set<string>();
   private openingEditor?: DayEditor;
   onDatesChange = () => {};
@@ -36,7 +36,7 @@ export class JournalView {
     dates.forEach(date => {
       const section = this.sections.get(date) ?? this.createSection(date);
       section.element.hidden = false;
-      const expanded = this.expanded.get(date) ?? false;
+      const expanded = this.expanded.has(date);
       section.toggle.setAttribute('aria-expanded', String(expanded));
       section.content.hidden = !expanded;
       section.element.classList.toggle('collapsed', !expanded);
@@ -75,7 +75,7 @@ export class JournalView {
     this.activeDate = date;
     this.opened.add(date);
     this.expanded.clear();
-    this.expanded.set(date, true);
+    this.expanded.add(date);
     this.render();
     const editor = this.editors.get(date)!;
     editor.receive(this.document(date));
@@ -106,8 +106,9 @@ export class JournalView {
   }
 
   stopFollowing(): void { this.openingEditor = undefined; }
+  focusActive(): void { this.editors.get(this.activeDate)?.view.focus(); }
   expandActive(): DayEditor {
-    this.expanded.set(this.activeDate, true);
+    this.expanded.add(this.activeDate);
     this.render();
     return this.editors.get(this.activeDate)!;
   }
@@ -134,7 +135,8 @@ export class JournalView {
     toggle.onclick = () => {
       this.stopFollowing();
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
-      this.expanded.set(date, !expanded);
+      if (expanded) this.expanded.delete(date);
+      else this.expanded.add(date);
       this.render();
       if (!expanded) {
         this.activeDate = date;
@@ -160,7 +162,7 @@ export class JournalView {
     }, () => {
       this.activeDate = date;
       this.opened.add(date);
-      this.expanded.set(date, true);
+      this.expanded.add(date);
       this.onDatesChange();
     });
     this.editors.set(date, editor);

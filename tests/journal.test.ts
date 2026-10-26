@@ -6,7 +6,7 @@ import { LocalStore } from '../src/storage/local';
 import { exportJournal, importJournal } from '../src/storage/backup';
 import { SyncEngine } from '../src/sync/engine';
 import { DropboxFiles } from '../src/sync/dropbox';
-import { MemoryCloud } from './helpers';
+import { addDay, MemoryCloud } from './helpers';
 import { strFromU8, unzipSync, zipSync } from 'fflate';
 
 const DATE = '2026-10-24';
@@ -22,7 +22,7 @@ async function device(name = crypto.randomUUID()) {
   const journal = new Journal(local, crypto.randomUUID());
   journals.push(journal);
   await journal.load();
-  await journal.ensureDay(DATE);
+  await addDay(journal, DATE);
   return journal;
 }
 afterEach(() => {
@@ -165,13 +165,7 @@ describe('Dropbox-shaped file sync', () => {
     expect(await journal.local.setting('dropbox-connection')).toEqual(original);
   });
 
-  it('preserves ownership from legacy connections and serializes two competing authorizations', async () => {
-    const journal = await device();
-    await journal.local.setSetting('dropbox-connection', { appKey: 'app', accountId: 'legacy' });
-    await DropboxFiles.open(journal.local);
-    await DropboxFiles.disconnect(journal.local);
-    await expect(saveConnection(journal, { appKey: 'app', accountId: 'other' })).rejects.toThrow();
-
+  it('serializes competing Dropbox authorizations and rejects a different app', async () => {
     const fresh = await device();
     const attempts = await Promise.allSettled([
       saveConnection(fresh, { appKey: 'app', accountId: 'first' }),
@@ -270,10 +264,10 @@ it('omits blank dates from Markdown while keeping their editing history restorab
   const journal = await device();
   await journal.edit(DATE, 'An older entry that was cleared.');
   await journal.edit(DATE, ' \n\t');
-  await journal.ensureDay('2026-10-25');
+  await addDay(journal, '2026-10-25');
   expect(markdown(journal.days)).toBe('');
   const name = `${crypto.randomUUID()}.jpg`;
-  await journal.ensureDay('2026-10-26');
+  await addDay(journal, '2026-10-26');
   await journal.edit('2026-10-26', `![Photo](photos/${name})`);
   const exported = await exportJournal(journal);
   const files = unzipSync(new Uint8Array(await exported.arrayBuffer()));

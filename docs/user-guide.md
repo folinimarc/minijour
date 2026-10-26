@@ -42,8 +42,6 @@ The password is never sent to Dropbox. There is no password reset: store it safe
 
 **Remember the key on this device** saves a non-exportable encryption key in the browser database. Otherwise, reopening requires the cloud password to resume sync. Writing locally works while cloud access is locked. **Lock cloud** forgets the saved key and stops cloud sync in the current tab; other open tabs retain their own unlocked sessions. **Disconnect** also removes this device's Dropbox connection.
 
-If the app finds files from an older, unencrypted version, settings shows **Import older cloud files**. This explicitly copies missing entries and photos into the current journal, then syncs them encrypted. It leaves the older files and Dropbox version history in place. Remove those separately in Dropbox if needed; encryption cannot retroactively protect copies already uploaded.
-
 Disconnecting preserves local and remote entries. The journal remains bound to its cloud provider, account, and application; connecting a different one is blocked before any journal data transfers. Use separate browser profiles for separate accounts.
 
 ## Storage and privacy
@@ -78,9 +76,7 @@ Cleanup checks references across all days, and rechecks after confirmation. A ph
 
 Permanent deletion removes photo files locally and from the current encrypted Dropbox folder. Small encrypted deletion records remain so other devices remove their copies on sync and do not upload them again. Interrupted cloud cleanup retries. Old backups cannot restore a permanently deleted photo into a journal that already knows about its deletion.
 
-**Permanent means undo will not recover the image.** An offline edit, undo, or old backup may bring back a link with a missing image. You can choose the original image again to add it as a new photo. Existing downloaded backups, older unencrypted Dropbox files, and cloud version history are not erased by cleanup.
-
-Update minijour on all devices before using permanent cleanup. Older app versions do not understand the deletion records and will stop cloud sync until updated.
+**Permanent means undo will not recover the image.** An offline edit, undo, or old backup may bring back a link with a missing image. You can choose the original image again to add it as a new photo. Existing downloaded backups and cloud version history are not erased by cleanup.
 
 ## Back up and restore
 

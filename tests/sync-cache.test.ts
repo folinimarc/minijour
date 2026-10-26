@@ -4,7 +4,7 @@ import * as day from '../src/domain/day';
 import { Journal } from '../src/domain/journal';
 import { LocalStore } from '../src/storage/local';
 import { SyncEngine } from '../src/sync/engine';
-import { MemoryCloud } from './helpers';
+import { addDay, MemoryCloud } from './helpers';
 
 const DATE = '2026-10-24';
 const devices: Journal[] = [];
@@ -141,7 +141,7 @@ it('does not retain a failed checkpoint download or invalid decoded bytes', asyn
 it('keeps an uploaded cache snapshot separate from typing that happens during the upload', async () => {
   const cloud = new MemoryCloud();
   const journal = await device();
-  await journal.ensureDay(DATE);
+  await addDay(journal, DATE);
   await journal.edit(DATE, 'First memory.');
   const upload = cloud.upload.bind(cloud);
   vi.spyOn(cloud, 'upload').mockImplementationOnce(async (path, bytes) => {

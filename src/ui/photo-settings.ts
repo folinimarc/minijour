@@ -1,6 +1,6 @@
 import { DEFAULT_PHOTO_OPTIONS, isPhotoOptions, type PhotoOptions } from '../domain/photos';
 import type { LocalStore } from '../storage/local';
-import type { mountShell } from './shell';
+import type { JournalUI } from './shell';
 
 const OPTIONS = 'photo-options';
 export async function loadPhotoOptions(local: LocalStore): Promise<PhotoOptions> {
@@ -9,7 +9,7 @@ export async function loadPhotoOptions(local: LocalStore): Promise<PhotoOptions>
 }
 
 /** Device preferences affect new uploads; existing photo bytes never change. */
-export async function setupPhotoSettings(ui: ReturnType<typeof mountShell>, local: LocalStore, notify: (error: unknown) => void): Promise<void> {
+export async function setupPhotoSettings(ui: JournalUI, local: LocalStore, notify: (error: unknown) => void): Promise<void> {
   let options = await loadPhotoOptions(local);
   const show = () => {
     ui.optimizePhotos.checked = options.optimize;

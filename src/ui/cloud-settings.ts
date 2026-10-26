@@ -4,11 +4,11 @@ import { VAULT_KEY_SETTING } from '../storage/local';
 import { connectCloud } from '../sync/providers';
 import type { CloudProvider, CloudSession } from '../sync/provider';
 import { SyncEngine } from '../sync/engine';
-import type { mountShell } from './shell';
+import type { JournalUI } from './shell';
 
 /** Shared account/unlock controls. Deployment configuration stays in providers. */
 export async function setupCloudSettings(
-  ui: ReturnType<typeof mountShell>, journal: Journal, providers: CloudProvider[],
+  ui: JournalUI, journal: Journal, providers: CloudProvider[],
   options: {
     busy: () => boolean; activity: (value: boolean) => void;
     change: (engine?: SyncEngine, providerName?: string) => void;
@@ -52,7 +52,6 @@ export async function setupCloudSettings(
     ui.unlock.disabled = working;
     ui.vaultDescription.textContent = header ? 'Enter the same cloud password you use on your other devices.'
       : 'Choose a cloud password of at least 12 characters. Use the same password on each device.';
-    ui.importLegacy.disabled = !unlocked || working;
   };
   const use = (vault: EncryptedFiles) => {
     unlocked = true;
@@ -72,8 +71,6 @@ export async function setupCloudSettings(
       const vault = EncryptedFiles.remembered(session.files, header, saved);
       if (vault) use(vault);
     }
-    ui.legacy.hidden = !session.legacyFiles || !(await session.legacyFiles.list()).length;
-    ui.legacyDescription.textContent = `Older, unencrypted files remain in ${providerName}. Import them to include entries from other devices. Importing leaves the originals and cloud version history in place; remove old copies separately if needed.`;
   };
   const buttons = providers.map(entry => {
     const button = document.createElement('button');
@@ -115,17 +112,7 @@ export async function setupCloudSettings(
     try {
       await session?.disconnect();
       session = undefined; header = undefined; unlocked = false; inspected = false;
-      options.change(); ui.legacy.hidden = true;
-    } finally { setWorking(false); show(); }
-  })().catch(options.notify); };
-  ui.importLegacy.onclick = () => { void (async () => {
-    guard();
-    if (!session?.legacyFiles || !unlocked) return;
-    setWorking(true); show();
-    try {
-      await new SyncEngine(journal, session.legacyFiles).importOnly();
-      await options.sync();
-      options.notify('Older files imported. The unencrypted originals and their version history remain in cloud storage.');
+      options.change();
     } finally { setWorking(false); show(); }
   })().catch(options.notify); };
   ui.sync.onclick = () => { void options.sync().catch(options.notify); };
@@ -135,7 +122,7 @@ export async function setupCloudSettings(
     try { await inspect(); } catch (error) { options.notify(error); }
     finally { setWorking(false); show(); }
   };
-  ui.checkCloud.onclick = () => { void check().then(options.sync); };
+  ui.checkCloud.onclick = () => { void check().then(options.sync).catch(options.notify); };
   window.addEventListener('online', () => {
     if (session && !inspected && !working) void check().then(options.requestSync);
   });

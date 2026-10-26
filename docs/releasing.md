@@ -4,17 +4,17 @@
 
 ## Versions and compatibility
 
-Use [Semantic Versioning](https://semver.org/). `package.json` is the application version; Git tags add `v`. The first intended version is `0.1.0`, unreleased until its tag and GitHub Release are published.
+Use [Semantic Versioning](https://semver.org/). `package.json` is the application version; Git tags add `v`.
 
 During initial development:
 
-- `0.1.1`: compatible fixes.
-- `0.2.0`: features or significant changes. Describe incompatibilities and migration paths.
+- `0.2.2`: fixes.
+- `0.3.0`: features or significant changes. Describe any removed functionality or incompatible formats.
 - `1.0.0`: established behavior and compatibility commitments.
 
 After 1.0, use patch releases for compatible fixes, minor releases for compatible features, and major releases for breaking changes. Internal refactoring alone does not require a major release. Choose versions manually and keep release notes useful to users.
 
-Compatibility includes stored journals, Dropbox documents, backups, and older installed PWAs. Even during 0.x, releases must not silently discard existing data. Storage-format versions are separate: routine updates must not rename `minijour-v1`. Test migrations and interoperability before changing schemas.
+Compatibility includes stored journals, Dropbox documents, backups, and older installed PWAs. During 0.x, obsolete development migration paths may be removed; document that in the changelog. Preserve current journal data when refactoring. Storage-format versions are separate: routine updates must not rename `minijour-v1`. Test migrations and interoperability before changing schemas.
 
 Keep `"private": true` in `package.json`. It prevents accidental npm publication and does not control GitHub visibility. Distribution is a static site and release archives, not an npm package.
 
@@ -25,17 +25,16 @@ Keep `"private": true` in `package.json`. It prevents accidental npm publication
 3. Update the package version without making a tag, for example:
 
    ```sh
-   npm version 0.1.1 --no-git-tag-version
+   npm version 0.3.0 --no-git-tag-version
    ```
 
-   For the first release, the existing `0.1.0` needs no bump.
-4. Move relevant changelog entries to a section formatted exactly `## 0.1.0 - YYYY-MM-DD` (using the chosen version and date), and leave **Unreleased** for subsequent work. Run `npm run release:check -- v0.1.0` to validate it.
+4. Move relevant changelog entries to a section formatted exactly `## 0.3.0 - YYYY-MM-DD` (using the chosen version and date), and leave **Unreleased** for subsequent work. Run `npm run release:check -- v0.3.0` to validate it.
 5. Run the developer checks. Commit and push the version, lockfile, and changelog together.
 6. Create and push an annotated tag for that exact commit:
 
    ```sh
-   git tag -a v0.1.0 -m "Release 0.1.0"
-   git push origin v0.1.0
+   git tag -a v0.3.0 -m "Release 0.3.0"
+   git push origin v0.3.0
    ```
 
 Use the chosen version consistently. Never move a published tag; correct mistakes with another release.
@@ -46,7 +45,7 @@ The release workflow validates the tag against the package and changelog, runs t
 
 Currently publication accepts stable `vMAJOR.MINOR.PATCH` tags; prerelease tags are rejected. Finish one release workflow before pushing the next release tag.
 
-Before the first tag, configure Pages, the deployment base path, and the public Dropbox app key using the deployment guide. Automation uses GitHub's repository token permissions for release assets and Pages; it needs no personal access token or Dropbox secret.
+Before publishing, configure Pages, the deployment base path, and the public Dropbox app key using the deployment guide. Automation uses GitHub's repository token permissions for release assets and Pages; it needs no personal access token or Dropbox secret.
 
 Published assets identify the version and exact source revision. Preserve GPL licensing, dependency notices, and corresponding source alongside the static archive. Never publish local profiles, credentials, journal backups, or test artifacts as release assets.
 

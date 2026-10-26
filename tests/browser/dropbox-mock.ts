@@ -8,7 +8,6 @@ export class DropboxMock {
   apiCalls = 0;
   deleteFailures = 0;
   deleteAlreadyMissing = false;
-  tokenRedirects: string[] = [];
   async install(context: BrowserContext) {
     await context.route('https://www.dropbox.com/oauth2/authorize?**', route => {
       const params = new URL(route.request().url()).searchParams;
@@ -20,7 +19,6 @@ export class DropboxMock {
     });
     await context.route('https://api.dropboxapi.com/oauth2/token', async route => {
       const params = new URLSearchParams(route.request().postData()!);
-      this.tokenRedirects.push(params.get('redirect_uri')!);
       expect(params.get('code_verifier')?.length).toBeGreaterThanOrEqual(43);
       await route.fulfill({ json: { access_token: 'test-token', refresh_token: 'test-refresh', expires_in: 14400, account_id: this.accountId } });
     });

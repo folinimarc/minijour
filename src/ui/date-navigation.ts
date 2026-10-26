@@ -1,11 +1,11 @@
 import { isDate, localDate } from '../domain/day';
 import type { JournalView } from './journal-view';
 import { icon } from './icons';
-import type { mountShell } from './shell';
+import type { JournalUI } from './shell';
 
 /** A small date drawer; navigation does not change what is stored or synced. */
 export function setupDateNavigation(
-  ui: ReturnType<typeof mountShell>, view: JournalView, notify: (error: unknown) => void,
+  ui: JournalUI, view: JournalView, notify: (error: unknown) => void,
 ): void {
   let rendered = '';
   const refresh = () => {

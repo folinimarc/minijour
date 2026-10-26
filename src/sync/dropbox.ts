@@ -28,7 +28,7 @@ export function dropboxProvider(appKey: string): CloudProvider {
     finishConnection: local => finishDropboxConnection(local, appKey),
     open: async local => {
       const files = await DropboxFiles.open(local, appKey);
-      return files ? { files, disconnect: () => DropboxFiles.disconnect(local), legacyFiles: files.legacy() } : undefined;
+      return files ? { files, disconnect: () => DropboxFiles.disconnect(local) } : undefined;
     },
   };
 }
@@ -37,15 +37,11 @@ function base64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
-export function redirectUri(): string {
-  return journalUrl.href;
-}
-
-export async function connectDropbox(appKey: string): Promise<void> {
+async function connectDropbox(appKey: string): Promise<void> {
   if (!/^[a-zA-Z0-9]+$/.test(appKey.trim())) throw new Error('Enter a valid Dropbox app key.');
   const verifier = base64url(crypto.getRandomValues(new Uint8Array(48)));
   const state = base64url(crypto.getRandomValues(new Uint8Array(24)));
-  const attempt: OAuthAttempt = { appKey: appKey.trim(), verifier, state, redirectUri: redirectUri() };
+  const attempt: OAuthAttempt = { appKey: appKey.trim(), verifier, state, redirectUri: journalUrl.href };
   sessionStorage.setItem(OAUTH, JSON.stringify(attempt));
   const challenge = base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
   const params = new URLSearchParams({
@@ -65,7 +61,7 @@ async function tokenRequest(params: URLSearchParams): Promise<TokenResponse> {
 }
 
 /** Finish PKCE after Dropbox redirects back. Tokens stay on this device. */
-export async function finishDropboxConnection(local: LocalStore, appKey: string): Promise<boolean> {
+async function finishDropboxConnection(local: LocalStore, appKey: string): Promise<boolean> {
   const params = new URLSearchParams(location.search);
   if (!params.has('code') && !params.has('error')) return false;
   const raw = sessionStorage.getItem(OAUTH);
@@ -94,14 +90,11 @@ export async function finishDropboxConnection(local: LocalStore, appKey: string)
 /** A thin Dropbox API adapter. Dropbox stores bytes; Automerge merges them. */
 export class DropboxFiles implements VaultStorage {
   private refreshing?: Promise<void>;
-  private constructor(private local: LocalStore, private connection: Connection, private root = ROOT) {}
+  private constructor(private local: LocalStore, private connection: Connection) {}
 
-  legacy(): DropboxFiles { return new DropboxFiles(this.local, this.connection, '/minijour-v1'); }
-
-  static async open(local: LocalStore, appKey?: string): Promise<DropboxFiles | undefined> {
+  static async open(local: LocalStore, appKey: string): Promise<DropboxFiles | undefined> {
     const connection = await local.cloudConnection<Connection>('dropbox');
-    if (connection && appKey && connection.appKey !== appKey) throw new Error('This journal uses a different Dropbox app. Its original app and account are needed to resume sync.');
-    if (connection) await local.saveCloudConnection(identity(connection), connection, { requireExisting: true });
+    if (connection && connection.appKey !== appKey) throw new Error('This journal uses a different Dropbox app. Its original app and account are needed to resume sync.');
     return connection ? new DropboxFiles(local, connection) : undefined;
   }
 
@@ -159,7 +152,7 @@ export class DropboxFiles implements VaultStorage {
   async list(): Promise<RemoteFile[]> {
     let page: FolderPage;
     try {
-      page = await (await this.request('files/list_folder', { path: this.root, recursive: true, include_deleted: false })).json();
+      page = await (await this.request('files/list_folder', { path: ROOT, recursive: true, include_deleted: false })).json();
     } catch (error) {
       if (error instanceof MissingPath) return [];
       throw error;
@@ -167,7 +160,7 @@ export class DropboxFiles implements VaultStorage {
     const files: RemoteFile[] = [];
     while (true) {
       for (const entry of page.entries) {
-        if (entry['.tag'] === 'file') files.push({ path: entry.path_lower.slice(this.root.length), revision: entry.rev });
+        if (entry['.tag'] === 'file') files.push({ path: entry.path_lower.slice(ROOT.length), revision: entry.rev });
       }
       if (!page.has_more) return files;
       page = await (await this.request('files/list_folder/continue', { cursor: page.cursor })).json();
@@ -175,13 +168,13 @@ export class DropboxFiles implements VaultStorage {
   }
 
   async download(path: string): Promise<Uint8Array> {
-    return new Uint8Array(await (await this.request('files/download', { path: this.root + path })).arrayBuffer());
+    return new Uint8Array(await (await this.request('files/download', { path: ROOT + path })).arrayBuffer());
   }
 
   async upload(path: string, bytes: Uint8Array): Promise<RemoteFile> {
     // Every open app has a unique writer path. Only that writer updates it.
     const result = await (await this.request('files/upload', {
-      path: this.root + path, mode: 'overwrite', autorename: false, mute: true,
+      path: ROOT + path, mode: 'overwrite', autorename: false, mute: true,
     }, bytes)).json() as { rev: string };
     return { path, revision: result.rev };
   }
@@ -189,7 +182,7 @@ export class DropboxFiles implements VaultStorage {
   async create(path: string, bytes: Uint8Array): Promise<boolean> {
     try {
       await this.request('files/upload', {
-        path: this.root + path, mode: 'add', autorename: false, strict_conflict: true, mute: true,
+        path: ROOT + path, mode: 'add', autorename: false, strict_conflict: true, mute: true,
       }, bytes);
       return true;
     } catch (error) {
@@ -199,7 +192,7 @@ export class DropboxFiles implements VaultStorage {
   }
 
   async remove(path: string): Promise<void> {
-    try { await this.request('files/delete_v2', { path: this.root + path }); }
+    try { await this.request('files/delete_v2', { path: ROOT + path }); }
     catch (error) { if (!(error instanceof MissingPath)) throw error; }
   }
 }

@@ -5,7 +5,7 @@ import { DEFAULT_PHOTO_OPTIONS, MAX_PHOTO_DIMENSION } from '../domain/photos';
 export function mountShell() {
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <header class="topbar">
-      <a class="wordmark" href="${appRoot.href}#about" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
+      <a class="wordmark" href="${appRoot.href}" aria-label="About minijour">${icon('book')}<span>minijour</span></a>
       <div class="topbar-right">
         <div class="header-actions">
           <button id="status-button" class="icon-button status-button" aria-label="Storage status. Open settings" aria-describedby="status" title="Opening your journal…" disabled>
@@ -70,10 +70,6 @@ export function mountShell() {
           <button id="unlock-button" class="primary-button" type="submit">Unlock cloud</button>
         </form>
         <button id="check-cloud-button" class="secondary-button" hidden>Retry cloud connection</button>
-        <div id="legacy-cloud" hidden>
-          <p id="legacy-cloud-description" class="help"></p>
-          <button id="import-legacy-button" class="secondary-button">Import older cloud files</button>
-        </div>
       </section>
       <section class="settings-section">
         <h2>Download and restore</h2>
@@ -90,7 +86,7 @@ export function mountShell() {
         <button id="review-photos-button" class="secondary-button">Clean up unused photos</button>
         <div id="photo-cleanup-review" hidden>
           <p id="photo-cleanup-summary"></p>
-          <p class="help">This permanently removes these photos from this device and your connected cloud storage. Deletion syncs to other devices. Undo, old backups, or offline edits may bring back links with missing images. Existing backups, older cloud files, and cloud version history are not changed.</p>
+          <p class="help">This permanently removes these photos from this device and your connected cloud storage. Deletion syncs to other devices. Undo, old backups, or offline edits may bring back links with missing images. Existing backups and cloud version history are not changed.</p>
           <div class="button-row"><button id="confirm-photo-cleanup" class="primary-button">Permanently delete photos</button><button id="cancel-photo-cleanup" class="text-button">Cancel</button></div>
         </div>
       </section>
@@ -136,8 +132,10 @@ export function mountShell() {
     confirmation: get<HTMLDivElement>('password-confirmation'), remember: get<HTMLInputElement>('remember-cloud'),
     unlock: get<HTMLButtonElement>('unlock-button'), lock: get<HTMLButtonElement>('lock-button'),
     checkCloud: get<HTMLButtonElement>('check-cloud-button'),
-    legacy: get<HTMLDivElement>('legacy-cloud'), legacyDescription: get<HTMLParagraphElement>('legacy-cloud-description'), importLegacy: get<HTMLButtonElement>('import-legacy-button'),
     connected: get<HTMLDivElement>('cloud-connected'), connectionDescription: get<HTMLParagraphElement>('connection-description'),
     install: get<HTMLButtonElement>('install-button'), update: get<HTMLButtonElement>('update-button'),
   };
 }
+
+/** DOM references inferred from the shell, shared by the small UI setup modules. */
+export type JournalUI = ReturnType<typeof mountShell>;

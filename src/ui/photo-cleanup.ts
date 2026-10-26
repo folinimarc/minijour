@@ -1,10 +1,10 @@
 import type { Journal } from '../domain/journal';
 import { unusedPhotos, type UnusedPhoto } from '../storage/photo-cleanup';
-import type { mountShell } from './shell';
+import type { JournalUI } from './shell';
 
 /** Explicit review/confirm keeps ordinary Markdown editing reversible. */
 export function setupPhotoCleanup(
-  ui: ReturnType<typeof mountShell>, journal: Journal,
+  ui: JournalUI, journal: Journal,
   options: {
     cloudBusy: () => boolean; cloudReady: () => boolean;
     sync: () => Promise<void>; busy: (value: boolean) => void; notify: (error: unknown) => void;

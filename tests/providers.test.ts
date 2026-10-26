@@ -53,15 +53,16 @@ it('rejects callbacks from a removed provider without exchanging tokens', async 
   expect(history.replaceState).toHaveBeenCalledWith(null, '', '/journal/');
 });
 
-it('preserves callback routing for old Dropbox authorization attempts', async () => {
+it('rejects callbacks without a selected provider rather than guessing from stored attempts', async () => {
   const values = browserCallback(), dropbox = provider('dropbox');
   values.set('minijour-oauth', 'legacy-attempt');
-  expect(await finishCloudConnection(await store(), [provider('other'), dropbox])).toBe(true);
-  expect(dropbox.finishConnection).toHaveBeenCalledOnce();
+  await expect(finishCloudConnection(await store(), [provider('other'), dropbox])).rejects.toThrow('started in another tab');
+  expect(dropbox.finishConnection).not.toHaveBeenCalled();
 });
 
 it('rejects a Dropbox callback if the deployed app key changed during authorization', async () => {
   const values = browserCallback(), fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  values.set('minijour-cloud-auth-provider', 'dropbox');
   values.set('minijour-oauth', JSON.stringify({ appKey: 'previouskey', state: 'test-state' }));
   const local = await store();
   await expect(finishCloudConnection(local, [dropboxProvider('currentkey')])).rejects.toThrow('sign-in has changed');
@@ -88,10 +89,10 @@ it('keeps provider, app, and account ownership after disconnect, including for f
   expect(await local.cloudConnection(original.providerId)).toEqual({ token: 'reconnected' });
 });
 
-it('preserves legacy Dropbox tokens, remembered keys, and binding when adopting the generic owner', async () => {
+it('opens the configured Dropbox connection without changing its tokens, remembered key, or owner', async () => {
   const local = await store();
   const connection = { appKey: 'originalkey', accountId: 'original-account', accessToken: 'original-token' };
-  await local.setSetting('dropbox-connection', connection);
+  await local.saveCloudConnection({ providerId: 'dropbox', appId: 'originalkey', accountId: 'original-account' }, connection);
   await local.setSetting('cloud-vault-key', { descriptor: 'existing-vault' });
   expect(await local.cloudOwner()).toEqual({ providerId: 'dropbox', appId: 'originalkey', accountId: 'original-account' });
   await DropboxFiles.open(local, 'originalkey');

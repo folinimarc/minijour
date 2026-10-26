@@ -3,26 +3,8 @@ import { EncryptedFiles } from '../src/crypto/vault';
 import { SyncEngine } from '../src/sync/engine';
 import { Journal } from '../src/domain/journal';
 import { LocalStore } from '../src/storage/local';
-import type { RemoteFile, VaultStorage } from '../src/sync/cloud';
+import { addDay, MemoryCloud } from './helpers';
 
-class MemoryCloud implements VaultStorage {
-  files = new Map<string, Uint8Array>();
-  revision = 0;
-  async remove(path: string): Promise<void> { this.files.delete(path); }
-  async list(): Promise<RemoteFile[]> {
-    return [...this.files.keys()].map(path => ({ path, revision: String(this.revision) }));
-  }
-  async download(path: string) { return this.files.get(path)!.slice(); }
-  async upload(path: string, bytes: Uint8Array) {
-    this.files.set(path, bytes.slice());
-    return { path, revision: String(++this.revision) };
-  }
-  async create(path: string, bytes: Uint8Array) {
-    if (this.files.has(path)) return false;
-    await this.upload(path, bytes);
-    return true;
-  }
-}
 const PASSWORD = 'four random words remembered';
 const PATH = `/days/2026-10-24/${crypto.randomUUID()}.automerge`;
 const bytes = (text: string) => new TextEncoder().encode(text);
@@ -33,7 +15,7 @@ async function device() {
   const journal = new Journal(local, crypto.randomUUID());
   journals.push(journal);
   await journal.load();
-  await journal.ensureDay('2026-10-24');
+  await addDay(journal, '2026-10-24');
   return journal;
 }
 afterEach(() => journals.splice(0).forEach(journal => { journal.close(); journal.local.close(); }));
@@ -43,14 +25,14 @@ it('encrypts paths and bytes, restores with the password, and uses a fresh nonce
   const vault = await EncryptedFiles.create(cloud, PASSWORD);
   await vault.upload(PATH, bytes('A private memory.'));
   const name = [...cloud.files.keys()].find(path => path !== '/vault.json')!;
-  const first = cloud.files.get(name)!.slice();
+  const first = cloud.files.get(name)!.bytes.slice();
   expect(name).toMatch(/^\/objects\/[a-f0-9]+\.bin$/);
   expect(name.split('/').at(-1)!.length).toBeLessThan(255);
   expect(text(first)).not.toContain('A private memory.');
   expect([...cloud.files.keys()].join()).not.toContain('2026-10-24');
-  expect(text(cloud.files.get('/vault.json')!)).not.toContain(PASSWORD);
+  expect(text(cloud.files.get('/vault.json')!.bytes)).not.toContain(PASSWORD);
   await vault.upload(PATH, bytes('A private memory.'));
-  expect(cloud.files.get(name)).not.toEqual(first);
+  expect(cloud.files.get(name)!.bytes).not.toEqual(first);
   expect(cloud.files.size).toBe(2);
   const other = await EncryptedFiles.unlock(cloud, (await EncryptedFiles.inspect(cloud))!, PASSWORD);
   expect((await other.list())[0].path).toBe(PATH);
@@ -60,13 +42,13 @@ it('encrypts paths and bytes, restores with the password, and uses a fresh nonce
 it('rejects wrong passwords and damaged headers without changing any cloud data', async () => {
   const cloud = new MemoryCloud();
   await EncryptedFiles.create(cloud, PASSWORD);
-  const original = cloud.files.get('/vault.json')!.slice();
+  const original = cloud.files.get('/vault.json')!.bytes.slice();
   const header = (await EncryptedFiles.inspect(cloud))!;
   await expect(EncryptedFiles.unlock(cloud, header, 'wrong password')).rejects.toThrow('Could not unlock');
-  expect(cloud.files.get('/vault.json')).toEqual(original);
-  cloud.files.set('/vault.json', bytes(JSON.stringify({ ...header, version: 99, memorySize: 2 ** 40 })));
+  expect(cloud.files.get('/vault.json')!.bytes).toEqual(original);
+  await cloud.upload('/vault.json', bytes(JSON.stringify({ ...header, version: 99, memorySize: 2 ** 40 })));
   await expect(EncryptedFiles.inspect(cloud)).rejects.toThrow('Unsupported');
-  cloud.files.delete('/vault.json'); cloud.files.set('/objects/orphan.bin', bytes('orphan'));
+  cloud.files.delete('/vault.json'); await cloud.upload('/objects/orphan.bin', bytes('orphan'));
   await expect(EncryptedFiles.create(cloud, PASSWORD)).rejects.toThrow('no vault header');
 });
 
@@ -78,15 +60,15 @@ it('detects changed contents, swapped ciphertext, and modified encrypted names',
   await vault.upload(photo, bytes('second'));
   await vault.list();
   const names = [...cloud.files.keys()].filter(path => path !== '/vault.json');
-  const original = cloud.files.get(names[0])!.slice();
-  cloud.files.set(names[0], cloud.files.get(names[1])!.slice());
+  const original = cloud.files.get(names[0])!.bytes.slice();
+  await cloud.upload(names[0], cloud.files.get(names[1])!.bytes);
   await expect(vault.download(PATH)).rejects.toThrow('verified');
   const corrupted = original.slice(); corrupted[20] ^= 1;
-  cloud.files.set(names[0], corrupted);
+  await cloud.upload(names[0], corrupted);
   await expect(vault.download(PATH)).rejects.toThrow('verified');
   cloud.files.delete(names[0]);
   const renamed = names[0].replace('/objects/', '/objects/00');
-  cloud.files.set(renamed, original);
+  await cloud.upload(renamed, original);
   await expect(vault.list()).rejects.toThrow('filename');
 });
 
@@ -99,9 +81,9 @@ it('creates one vault when devices race, and never replaces a vault with a diffe
   await first.upload(PATH, bytes('shared memory'));
   await second.list();
   expect(text(await second.download(PATH))).toBe('shared memory');
-  const header = cloud.files.get('/vault.json')!.slice();
+  const header = cloud.files.get('/vault.json')!.bytes.slice();
   await expect(EncryptedFiles.create(cloud, 'a different long password')).rejects.toThrow('Could not unlock');
-  expect(cloud.files.get('/vault.json')).toEqual(header);
+  expect(cloud.files.get('/vault.json')!.bytes).toEqual(header);
   const fresh = new MemoryCloud();
   const attempts = await Promise.allSettled([
     EncryptedFiles.create(fresh, PASSWORD), EncryptedFiles.create(fresh, 'another unrelated password'),
@@ -125,7 +107,7 @@ it('stores a non-exportable remembered key and requires an exact vault match', a
   await expect(restored.list()).rejects.toThrow('no vault header');
 });
 
-it('converges offline edits and photos through encrypted storage, and imports legacy data without writes', async () => {
+it('converges offline edits and photos through encrypted storage', async () => {
   const cloud = new MemoryCloud();
   const firstVault = await EncryptedFiles.create(cloud, PASSWORD);
   const secondVault = await EncryptedFiles.unlock(cloud, (await EncryptedFiles.inspect(cloud))!, PASSWORD);
@@ -140,16 +122,6 @@ it('converges offline edits and photos through encrypted storage, and imports le
   expect(phone.days.get('2026-10-24')!.text).toBe(laptop.days.get('2026-10-24')!.text);
   expect(phone.days.get('2026-10-24')!.text).toContain('Laptop memory.');
   expect(await (await laptop.local.photo(photo))!.text()).toBe('private photo');
-  const legacy = new MemoryCloud();
-  const older = await device();
-  await older.edit('2026-10-24', 'Older memory.');
-  await new SyncEngine(older, legacy).sync();
-  const writes = legacy.revision;
-  await new SyncEngine(phone, legacy).importOnly();
-  expect(legacy.revision).toBe(writes);
-  expect(phone.days.get('2026-10-24')!.text).toContain('Older memory.');
-  await first.sync(); await second.sync();
-  expect(laptop.days.get('2026-10-24')!.text).toContain('Older memory.');
 });
 
 it('encrypts deletion records and removes all opaque copies of a concurrently uploaded photo', async () => {
@@ -168,7 +140,7 @@ it('encrypts deletion records and removes all opaque copies of a concurrently up
   expect(listed.map(file => file.path)).toEqual([`/deleted-photos/${name}.json`]);
   for (const [opaque, contents] of cloud.files) {
     expect(opaque).not.toContain(name);
-    expect(text(contents)).not.toContain(name);
+    expect(text(contents.bytes)).not.toContain(name);
   }
   await first.remove(path); // Already absent is a successful removal.
 });

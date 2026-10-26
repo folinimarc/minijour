@@ -4,7 +4,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
-import { PhotoUrls } from './photos';
+import type { PhotoUrls } from './photos';
 import { photoPreviews, refreshPhotos } from './photo-previews';
 import { editDay, type DayDoc } from '../domain/day';
 
@@ -97,5 +97,4 @@ export class DayEditor {
     this.view.dispatch({ effects: EditorView.scrollIntoView(this.view.state.doc.length, { y: 'end', yMargin: 24 }) });
   }
   refreshPhotos(): void { this.view.dispatch({ effects: refreshPhotos.of() }); }
-  destroy(): void { this.view.destroy(); }
 }

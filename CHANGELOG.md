@@ -6,6 +6,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Changed
 
+- Simplify application setup into focused UI modules and add a shorter developer guide with a separate architecture reference.
+- Remove the obsolete plaintext-cloud importer, early Dropbox ownership migration, and old root-page OAuth/PWA redirects. Current local journals, connections, encrypted cloud files, and backups keep their formats.
 - Add device-local photo preferences: choose the resize limit for optimized JPEGs, or keep original files unchanged. Sync, backups, previews, and cleanup support the original formats.
 - Batch local saves and encrypted cloud sync after 1.5 seconds without editing. Failed local saves retry after 10 seconds; new edits use the normal pause again. There is no recurring local-save check.
 - Avoid serializing the full day on each keystroke. Edits made during a save remain pending for a later batch, and slow cloud requests do not block local saves or trigger immediate extra sync rounds.
@@ -16,6 +18,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ### Fixed
 
+- Report failed installation prompts and failed saves during cloud reconnection through the normal in-app notice.
 - Hide today's delete button in the date sidebar, including after midnight rollover.
 - Return focus to writing when settings closes without overriding later keyboard navigation.
 - Keep photo preview space stable during loading and scrolling by using editor block decorations and frames with the image's aspect ratio.

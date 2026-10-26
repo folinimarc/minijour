@@ -1,6 +1,15 @@
-import type { CloudFiles, RemoteFile } from '../src/sync/cloud';
+import type { VaultStorage, RemoteFile } from '../src/sync/cloud';
+import type { Journal } from '../src/domain/journal';
+import { createDay } from '../src/domain/day';
 
-export class MemoryCloud implements CloudFiles {
+/** A saved empty day for tests; the UI keeps blank drafts outside the journal. */
+export async function addDay(journal: Journal, date: string): Promise<void> {
+  if (journal.days.has(date)) return;
+  journal.stage(date, createDay(date));
+  await journal.flush();
+}
+
+export class MemoryCloud implements VaultStorage {
   files = new Map<string, { bytes: Uint8Array; revision: string }>();
   uploads = 0;
   async create(path: string, bytes: Uint8Array): Promise<boolean> {

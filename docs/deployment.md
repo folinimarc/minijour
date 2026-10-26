@@ -51,13 +51,13 @@ Use a leading and trailing slash. This controls asset URLs and the PWA identity;
 
 Publish `dist/`. Keep a stable origin and path: browser storage belongs to the origin and Dropbox checks redirect URIs exactly. Build with the final hosting path; changing it requires rebuilding. Keep license notices and corresponding source available when distributing builds; see the [release guide](releasing.md).
 
-Encrypted sync is browser-to-Dropbox; the website host does not hold passwords or journal keys. Keep deployments trustworthy: anyone controlling the served JavaScript could read unlocked data. Update all devices together when moving from the legacy plaintext cloud format; old builds keep writing to the old folder.
+Encrypted sync is browser-to-Dropbox; the website host does not hold passwords or journal keys. Keep deployments trustworthy: anyone controlling the served JavaScript could read unlocked data.
 
 The service worker caches app assets including Automerge's WebAssembly, not Dropbox requests or journal data. Updates wait for the user to choose reload after pending local edits save.
 
 ## GitHub Pages
 
-The default project URL is `https://folinimarc.github.io/minijour/`; it is not necessarily deployed yet. Register `https://folinimarc.github.io/minijour/journal/` as the Dropbox redirect URI.
+The project Pages URL is `https://folinimarc.github.io/minijour/`. Register `https://folinimarc.github.io/minijour/journal/` as the Dropbox redirect URI.
 
 1. Choose **Settings → Pages → Source → GitHub Actions**.
 2. Add public repository variable `VITE_DROPBOX_APP_KEY` under **Settings → Secrets and variables → Actions → Variables**. Changing it does not update an existing static deployment: build and deploy a new release, then accept the installed PWA update if needed.
@@ -67,7 +67,7 @@ The default project URL is `https://folinimarc.github.io/minijour/`; it is not n
 
 Pages supports public repositories on GitHub Free. Private source repositories require an eligible paid plan; they can publish a public website. Journal data still stays on users' devices and their Dropbox accounts.
 
-When upgrading older deployments, add the new `/journal/` redirect URI before deploying. Keep the old root redirect URI registered until in-flight sign-ins from old app versions are finished. Root callbacks are forwarded to the journal while preserving the original OAuth attempt. Existing browser data stays in the same IndexedDB database. The manifest ID matches the former root launch URL; older installed apps that still launch there are forwarded directly to writing. The journal's wordmark opens the information page deliberately.
+Register the `/journal/` redirect URI for the deployed path. OAuth callbacks belong to that page; the home page does not forward callbacks. Installed apps launch directly into the journal, and its wordmark opens the information page.
 
 For a custom domain, configure Pages and update Dropbox's redirect URI, then test installation at the final address.
 
@@ -79,7 +79,7 @@ Automated tests mock Dropbox. Verify these steps with real accounts and devices:
 - Write offline, reconnect, and retrieve the text on another device.
 - Capture and choose a photo, then verify cross-device download.
 - Export and restore a backup in a separate browser profile.
-- Update all devices before using permanent photo cleanup. Test review/cancel, deletion sync, and reconnecting an offline device; older clients stop syncing when they encounter deletion records.
+- Test photo-cleanup review/cancel, deletion sync, and reconnecting an offline device.
 - Install, reload offline, and update at the actual hosted subdirectory URL.
 - Check the on-screen keyboard and record browsers/devices tested.
 

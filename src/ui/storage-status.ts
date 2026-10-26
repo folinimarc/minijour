@@ -1,5 +1,5 @@
 import { icon } from './icons';
-import type { mountShell } from './shell';
+import type { JournalUI } from './shell';
 
 type StorageIcon = 'device' | 'device-check' | 'device-alert' | 'cloud-check' | 'cloud-alert' | 'cloud-sync';
 export type StorageStatus = { icon: StorageIcon; text: string; busy?: boolean; warning?: boolean };
@@ -28,7 +28,7 @@ export function storageStatus(state: StorageState): StorageStatus {
 }
 
 /** The header is compact; the same symbol and explanation appear in settings. */
-export function renderStorageStatus(ui: ReturnType<typeof mountShell>, status: StorageStatus): void {
+export function renderStorageStatus(ui: JournalUI, status: StorageStatus): void {
   if (ui.statusButton.dataset.icon !== status.icon) {
     const svg = icon(status.icon);
     ui.statusIcon.innerHTML = svg; ui.cloudStatusIcon.innerHTML = svg;

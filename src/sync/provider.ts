@@ -1,11 +1,10 @@
 import type { LocalStore } from '../storage/local';
-import type { CloudFiles, VaultStorage } from './cloud';
+import type { VaultStorage } from './cloud';
 
 /** Authentication belongs to a provider; encryption and sync use only files. */
 export interface CloudSession {
   files: VaultStorage;
   disconnect(): Promise<void>;
-  legacyFiles?: CloudFiles;
 }
 
 export interface CloudProvider {

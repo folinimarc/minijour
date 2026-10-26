@@ -1,23 +1,24 @@
-/// <reference types="vite-plugin-pwa/client" />
 import * as A from '@automerge/automerge';
 import automergeWasm from '@automerge/automerge/automerge.wasm?url';
-import { registerSW } from 'virtual:pwa-register';
 import { localDate } from './domain/day';
 import { Journal } from './domain/journal';
 import { LocalStore } from './storage/local';
-import { exportJournal, importJournal } from './storage/backup';
 import { configuredProviders, finishCloudConnection } from './sync/providers';
 import { setupCloudSettings } from './ui/cloud-settings';
 import { setupPhotoCleanup } from './ui/photo-cleanup';
 import { setupStorageBanner } from './ui/storage-banner';
 import { protectStorage } from './storage/persistence';
 import { Autosave } from './storage/autosave';
-import { SyncEngine } from './sync/engine';
+import type { SyncEngine } from './sync/engine';
 import { JournalView } from './ui/journal-view';
 import { setupDateNavigation } from './ui/date-navigation';
-import { PhotoUrls, preparePhoto } from './ui/photos';
-import { loadPhotoOptions, setupPhotoSettings } from './ui/photo-settings';
+import { PhotoUrls } from './ui/photos';
+import { setupPhotoSettings } from './ui/photo-settings';
 import { mountShell } from './ui/shell';
+import { setupPhotoInput } from './ui/photo-input';
+import { setupSettingsDialog } from './ui/settings-dialog';
+import { setupBackupControls } from './ui/backup-controls';
+import { setupPwa } from './ui/pwa';
 import { renderStorageStatus, storageStatus } from './ui/storage-status';
 import './style.css';
 
@@ -43,7 +44,6 @@ async function start(): Promise<void> {
   let cloudConnected = false;
   let cloudAvailable = false;
   let syncError = false;
-  let lastSync: Date | undefined;
   let dirty = true;
   let changeRevision = 0;
   let runningSync: Promise<void> | undefined;
@@ -51,7 +51,9 @@ async function start(): Promise<void> {
   let cloudName: string | undefined;
   const providers = configuredProviders();
   let nextDay: ReturnType<typeof setTimeout>;
-  let photoTarget: { date: string; anchor: A.Cursor; head: A.Cursor } | undefined;
+
+  const autosave = new Autosave(saveBatch,
+    () => journal.hasUnsavedChanges || !!engine && dirty && !cleaning, notify);
 
   await journal.load();
   await setupPhotoSettings(ui, local, notify);
@@ -60,7 +62,6 @@ async function start(): Promise<void> {
   const view = new JournalView(ui.journal, journal, urls, {
     edited: () => autosave.edited(), notify, canFocus: () => !ui.dialog.open && !ui.dateSidebar.open,
   });
-  const editors = view.editors;
   setupDateNavigation(ui, view, notify);
   let justConnected = false;
   try { justConnected = await finishCloudConnection(local, providers); } catch (error) { notify(error); }
@@ -69,7 +70,7 @@ async function start(): Promise<void> {
     renderStorageStatus(ui, storageStatus({
       saveError: !!journal.saveError, saving: journal.pending > 0, unsaved: journal.hasUnsavedChanges,
       cleaning, syncing, syncError, connected: cloudConnected, available: cloudAvailable,
-      unlocked: !!engine, cloudWorking, online: navigator.onLine, synced: !!lastSync && !dirty, cloudName,
+      unlocked: !!engine, cloudWorking, online: navigator.onLine, synced: !dirty, cloudName,
     }));
     ui.sync.disabled = syncing || cleaning;
     ui.sync.textContent = syncing ? 'Syncing…' : 'Sync now';
@@ -101,7 +102,6 @@ async function start(): Promise<void> {
       runningSync = engine.sync();
       await runningSync;
       syncError = false;
-      lastSync = new Date();
       dirty = revision !== changeRevision;
     } catch (error) {
       syncError = true;
@@ -121,8 +121,6 @@ async function start(): Promise<void> {
     if (!force && (!autosave.isIdle || journal.hasUnsavedChanges)) return;
     if (dirty && !syncing) void syncCloud().catch(notify);
   }
-  const autosave = new Autosave(saveBatch,
-    () => journal.hasUnsavedChanges || !!engine && dirty && !cleaning, notify);
 
   function scheduleSync(): void {
     dirty = true;
@@ -174,89 +172,9 @@ async function start(): Promise<void> {
   ui.journal.addEventListener('load', revealOpening, true);
   window.visualViewport?.addEventListener('resize', revealOpening);
 
-  ui.settingsButton.onclick = () => {
-    closePhotoMenu();
-    ui.dialog.append(ui.notice); ui.dialog.showModal();
-  };
-  ui.statusButton.onclick = () => { ui.settingsButton.click(); ui.dialog.scrollTop = 0; };
-  // Return to writing immediately; a queued close event must not steal later focus.
-  const closeSettings = () => {
-    ui.dialog.close(); document.body.append(ui.notice);
-    editors.get(view.activeDate)?.view.focus();
-  };
-  ui.closeSettings.onclick = closeSettings;
-  ui.dialog.oncancel = event => { event.preventDefault(); closeSettings(); };
-  ui.dialog.addEventListener('click', event => { if (event.target === ui.dialog && event.clientX) {
-    const box = ui.dialog.getBoundingClientRect();
-    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeSettings();
-  } });
-  ui.export.onclick = () => { void (async () => {
-    ui.export.disabled = true;
-    try {
-      const blob = await exportJournal(journal);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url; link.download = `minijour-${localDate()}.zip`; link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } finally { ui.export.disabled = false; }
-  })().catch(notify); };
-  ui.restore.onclick = () => ui.restoreInput.click();
-  ui.restoreInput.onchange = () => { void (async () => {
-    const file = ui.restoreInput.files?.[0];
-    ui.restoreInput.value = '';
-    if (!file) return;
-    await importJournal(journal, file);
-    scheduleSync();
-    notify('Backup restored. Its entries have been combined with your journal.');
-  })().catch(notify); };
-
-  function closePhotoMenu(): void {
-    ui.photoMenu.hidden = true;
-    ui.photoButton.setAttribute('aria-expanded', 'false');
-  }
-  ui.photoButton.onpointerdown = event => { event.preventDefault(); };
-  ui.photoButton.onclick = () => {
-    if (!ui.photoMenu.hidden) { closePhotoMenu(); return; }
-    const editor = view.expandActive();
-    const selection = editor.view.state.selection.main;
-    photoTarget = {
-      date: view.activeDate,
-      anchor: A.getCursor(editor.doc, ['text'], selection.anchor),
-      head: A.getCursor(editor.doc, ['text'], selection.head),
-    };
-    ui.photoMenu.hidden = false;
-    ui.photoButton.setAttribute('aria-expanded', 'true');
-  };
-  ui.cameraButton.onclick = () => { closePhotoMenu(); ui.cameraInput.click(); };
-  ui.chooseButton.onclick = () => { closePhotoMenu(); ui.photoInput.click(); };
-  document.addEventListener('pointerdown', event => {
-    if (!(event.target as HTMLElement).closest('.photo-tools')) closePhotoMenu();
-  });
-  document.addEventListener('keydown', event => { if (event.key === 'Escape') closePhotoMenu(); });
-
-  async function addPhoto(input: HTMLInputElement): Promise<void> {
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file || !photoTarget) return;
-    ui.photoButton.disabled = true;
-    try {
-      const photo = await preparePhoto(file, await loadPhotoOptions(local));
-      await local.savePhoto(photo.name, photo.blob);
-      const editor = editors.get(photoTarget.date)!;
-      const anchor = A.getCursorPosition(editor.doc, ['text'], photoTarget.anchor);
-      const head = A.getCursorPosition(editor.doc, ['text'], photoTarget.head);
-      const from = Math.min(anchor, head), to = Math.max(anchor, head);
-      const before = editor.view.state.doc.sliceString(0, from);
-      const prefix = before.length && !before.endsWith('\n') ? '\n' : '';
-      const insert = `${prefix}![Photo](photos/${photo.name})\n`;
-      editor.view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + insert.length }, scrollIntoView: true });
-      journal.photosChanged();
-      scheduleSync();
-      editor.view.focus();
-    } finally { ui.photoButton.disabled = false; }
-  }
-  ui.cameraInput.onchange = () => { void addPhoto(ui.cameraInput).catch(notify); };
-  ui.photoInput.onchange = () => { void addPhoto(ui.photoInput).catch(notify); };
+  const closePhotoMenu = setupPhotoInput(ui, journal, view, notify);
+  setupSettingsDialog(ui, view, closePhotoMenu);
+  setupBackupControls(ui, journal, notify);
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
@@ -274,18 +192,7 @@ async function start(): Promise<void> {
   window.addEventListener('pagehide', () => { void saveBatch(true).catch(notify); });
   setInterval(() => { if (engine && document.visibilityState === 'visible') scheduleSync(); }, 30_000);
 
-  // Updates wait for a reload: replacing an open editor while typing is unsafe.
-  const updateSW = registerSW({ onNeedRefresh() { ui.update.hidden = false; }, onRegisterError: () => {
-    notify('Offline installation did not finish. Keep this tab open and try reloading when online.');
-  } });
-  ui.update.onclick = () => { void journal.flush().then(() => updateSW(true)).catch(notify); };
-  type InstallPrompt = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> };
-  window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
-    const install = event as InstallPrompt;
-    ui.install.hidden = false;
-    ui.install.onclick = () => { void install.prompt().then(() => install.userChoice).then(() => { ui.install.hidden = true; }); };
-  });
+  setupPwa(ui, journal, notify);
   setupPhotoCleanup(ui, journal, {
     cloudReady: () => !!engine,
     cloudBusy: () => cloudWorking,
@@ -303,7 +210,7 @@ async function start(): Promise<void> {
     busy: () => syncing || cleaning,
     activity: value => { cloudWorking = value; },
     change: (next, name) => {
-      engine = next; cloudName = name; syncError = false; lastSync = undefined; dirty = true;
+      engine = next; cloudName = name; syncError = false; dirty = true;
       updateStatus();
     },
     connection: (value, available) => {

@@ -24,9 +24,7 @@ export async function finishCloudConnection(local: LocalStore, providers: CloudP
   const params = new URLSearchParams(location.search);
   if (!params.has('code') && !params.has('error')) return false;
   try {
-    // Preserve OAuth attempts started by versions predating the registry.
-    const id = sessionStorage.getItem(AUTH_PROVIDER)
-      ?? (sessionStorage.getItem('minijour-oauth') ? 'dropbox' : undefined);
+    const id = sessionStorage.getItem(AUTH_PROVIDER);
     if (!id) throw new Error('Cloud connection was started in another tab. Please try again.');
     const provider = providers.find(provider => provider.id === id);
     if (!provider) throw new Error('This cloud connection is unavailable on this website. Your journal stays on this device.');

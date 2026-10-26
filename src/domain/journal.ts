@@ -1,5 +1,5 @@
 import * as A from '@automerge/automerge';
-import { createDay, editDay, heads, isDate, loadDay, mergeDays, type DayDoc } from './day';
+import { editDay, heads, isDate, loadDay, mergeDays, type DayDoc } from './day';
 import type { LocalStore } from '../storage/local';
 
 export type ChangeOrigin = 'local' | 'remote';
@@ -65,14 +65,6 @@ export class Journal {
     this.accept(date, doc, 'local', true);
   }
 
-  async ensureDay(date: string): Promise<void> {
-    if (this.days.has(date)) return;
-    this.days.set(date, createDay(date));
-    this.unsaved.set(date, ++this.revision);
-    this.emit({ date, origin: 'local' });
-    await this.flush();
-  }
-
   async edit(date: string, text: string): Promise<void> {
     const doc = this.days.get(date);
     if (!doc || doc.text === text) return;
@@ -82,14 +74,14 @@ export class Journal {
     await this.flush();
   }
 
-  async merge(date: string, bytes: Uint8Array, origin: ChangeOrigin = 'remote'): Promise<void> {
-    await this.mergeDoc(date, loadDay(bytes), origin);
+  async merge(date: string, bytes: Uint8Array): Promise<void> {
+    await this.mergeDoc(date, loadDay(bytes));
   }
 
   /** Sync can reuse a validated, decoded checkpoint without serializing it again. */
-  async mergeDoc(date: string, doc: DayDoc, origin: ChangeOrigin = 'remote'): Promise<void> {
+  async mergeDoc(date: string, doc: DayDoc): Promise<void> {
     if (!isDate(date)) throw new Error('Invalid journal date.');
-    const changed = this.accept(date, doc, origin, true);
+    const changed = this.accept(date, doc, 'remote', true);
     // A previous attempt may have merged successfully but failed to save.
     if (changed || this.unsaved.has(date)) await this.flush();
   }

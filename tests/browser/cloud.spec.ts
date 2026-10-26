@@ -1,5 +1,3 @@
-import * as A from '@automerge/automerge';
-import { createDay, editDay } from '../../src/domain/day';
 import { expect, test } from '@playwright/test';
 import { DropboxMock } from './dropbox-mock';
 import { openDate, openJournal, addTestPhoto, replaceEntry, storedDates, storedPhotos, connect, unlock, sync, PASSWORD } from './helpers';
@@ -159,38 +157,31 @@ test('requires matching passwords on setup and keeps local writing available aft
   await expect(page.getByRole('button', { name: 'Retry cloud connection' })).toBeVisible();
 });
 
-test('imports older plaintext Dropbox entries and photos explicitly without modifying their originals', async ({ page, context }) => {
-  const mock = new DropboxMock();
-  const photo = `${crypto.randomUUID()}.jpg`;
-  const path = `/minijour-v1/days/2020-01-01/${crypto.randomUUID()}.automerge`;
-  const original = Buffer.from(A.save(editDay(createDay('2020-01-01'), `Older private memory. ![Photo](photos/${photo})`)));
-  mock.files.set(path, { bytes: original, revision: 'old' });
-  mock.files.set(`/minijour-v1/photos/${photo}`, { bytes: Buffer.from('older photo'), revision: 'old-photo' });
-  await mock.install(context);
-  await openJournal(page); await connect(page);
-  await expect(page.locator('.cm-content')).not.toContainText('Older private memory.');
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.locator('#legacy-cloud')).toContainText('unencrypted files remain');
-  await page.getByRole('button', { name: 'Import older cloud files' }).click();
-  await expect(page.getByRole('alert')).toContainText('Older files imported');
-  await page.getByRole('button', { name: 'Close settings' }).click();
-  await openDate(page, '2020-01-01');
-  await expect(page.locator('[data-date="2020-01-01"] .cm-content')).toContainText('Older private memory.');
-  expect(mock.files.get(path)!.bytes).toEqual(original);
-  expect([...mock.files.keys()].filter(name => name.startsWith('/minijour-v1/'))).toHaveLength(2);
-  expect([...mock.files.keys()].some(name => name.startsWith('/minijour-encrypted-v1/objects/'))).toBe(true);
-});
 
-test('finishes a sign-in started by an older app at the root redirect URI', async ({ page, context, baseURL }) => {
+test('reports a failed local save during cloud reconnection without an unhandled rejection', async ({ page, context }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
   const mock = new DropboxMock(); await mock.install(context);
-  await page.goto('./');
-  await page.evaluate(({ redirectUri, appKey }) => sessionStorage.setItem('minijour-oauth', JSON.stringify({
-    appKey, verifier: 'v'.repeat(64), state: 'old-state', redirectUri,
-  })), { redirectUri: baseURL!, appKey: process.env.VITE_DROPBOX_APP_KEY! });
-  await page.goto('./?code=old-code&state=old-state');
-  await expect(page).toHaveURL(/\/journal\/$/);
-  await unlock(page);
-  expect(mock.tokenRedirects).toEqual([baseURL]);
+  await openJournal(page); await connect(page);
+  const listing = 'https://api.dropboxapi.com/2/files/list_folder';
+  await context.route(listing, route => route.abort());
+  await page.reload();
+  await expect(page.getByRole('status')).toHaveText('Cloud storage unavailable');
+  await context.unroute(listing);
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args: Parameters<typeof put>) {
+      if (this.name === 'days') throw new DOMException('Device storage is full.', 'QuotaExceededError');
+      return put.apply(this, args);
+    };
+  });
+  await page.keyboard.insertText('A memory waiting to save.');
+  await expect(page.getByRole('alert')).toContainText('Device storage is full');
+  await page.getByRole('button', { name: 'Dismiss message', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Retry cloud connection', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Device storage is full');
+  expect(errors).toEqual([]);
 });
 
 test('does not remember a key when another tab disconnects during unlock', async ({ page, context }) => {
@@ -296,30 +287,6 @@ test('requires unlocked online Dropbox access before cleanup and retries interru
   expect(await storedPhotos(page)).toEqual([]);
   await expect(page.getByRole('status')).toHaveText('Saved to Dropbox');
   expect([...before].filter(path => !mock.files.has(path))).toHaveLength(1);
-});
-
-test('waits for an in-progress legacy import before allowing cleanup', async ({ page, context }) => {
-  const mock = new DropboxMock();
-  const path = `/minijour-v1/days/2020-01-01/${crypto.randomUUID()}.automerge`;
-  mock.files.set(path, { bytes: Buffer.from(A.save(editDay(createDay('2020-01-01'), 'An older entry.'))), revision: 'old' });
-  await mock.install(context);
-  await openJournal(page); await connect(page);
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  let release!: () => void, reached!: () => void;
-  const held = new Promise<void>(resolve => { release = resolve; });
-  const waiting = new Promise<void>(resolve => { reached = resolve; });
-  await context.route('https://content.dropboxapi.com/2/files/download', async route => {
-    const args = JSON.parse(route.request().headers()['dropbox-api-arg']);
-    if (args.path === path) { reached(); await held; }
-    await route.fallback();
-  });
-  await page.getByRole('button', { name: 'Import older cloud files' }).click();
-  await waiting;
-  await page.getByRole('button', { name: 'Clean up unused photos' }).click();
-  await expect(page.getByRole('alert')).toContainText('Wait for the current cloud operation');
-  await expect(page.locator('#photo-cleanup-review')).toBeHidden();
-  release();
-  await expect(page.getByRole('alert')).toContainText('Older files imported');
 });
 
 test('honors cancellation while the confirmation sync is still in flight', async ({ page, context }) => {

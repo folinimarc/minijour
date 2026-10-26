@@ -1,11 +1,11 @@
 import type { LocalStore } from '../storage/local';
-import type { mountShell } from './shell';
+import type { JournalUI } from './shell';
 
 const DISMISSED = 'local-storage-banner-dismissed';
 
 /** Local advice, dismissed on this browser only and excluded from backups. */
 export async function setupStorageBanner(
-  ui: ReturnType<typeof mountShell>, local: LocalStore, hasProviders: boolean,
+  ui: JournalUI, local: LocalStore, hasProviders: boolean,
   notify: (error: unknown) => void,
 ): Promise<(connected: boolean) => void> {
   let dismissed = await local.setting<boolean>(DISMISSED).catch(() => false) === true;

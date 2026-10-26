@@ -6,7 +6,7 @@ import { LocalStore } from '../src/storage/local';
 import { unusedPhotos } from '../src/storage/photo-cleanup';
 import { exportJournal, importJournal } from '../src/storage/backup';
 import { SyncEngine } from '../src/sync/engine';
-import { MemoryCloud } from './helpers';
+import { addDay, MemoryCloud } from './helpers';
 import { EncryptedFiles } from '../src/crypto/vault';
 
 const DATE = '2026-10-24';
@@ -15,7 +15,7 @@ const journals: Journal[] = [];
 async function device(database = crypto.randomUUID()) {
   const journal = new Journal(await LocalStore.open(database), crypto.randomUUID());
   journals.push(journal);
-  await journal.load(); await journal.ensureDay(DATE);
+  await journal.load(); await addDay(journal, DATE);
   return journal;
 }
 async function photo(journal: Journal, name = photoName()) {
@@ -100,7 +100,7 @@ it('recognizes photo paths conservatively across Markdown styles and all days', 
   const first = await photo(journal), second = await photo(journal), third = await photo(journal);
   await journal.edit(DATE, `![photo](photos/${first} "A title")\n[attachment]: photos/${second}\n\`photos/${third}\``);
   expect(referencedPhotos([journal.days.get(DATE)!.text])).toEqual(new Set([first, second, third]));
-  await journal.ensureDay('2026-10-25');
+  await addDay(journal, '2026-10-25');
   await journal.edit('2026-10-25', `![again](photos/${first})`);
   await journal.edit(DATE, 'Removed from the first day.');
   expect((await unusedPhotos(journal)).map(file => file.name).sort()).toEqual([second, third].sort());
@@ -117,7 +117,7 @@ it('rechecks other tabs and deletes only the reviewed IDs, preserving new refere
   expect(plan).toHaveLength(2);
   expect(plan.reduce((sum, file) => sum + file.size, 0)).toBe(22);
   const other = await device(database);
-  await other.ensureDay('2026-10-25');
+  await addDay(other, '2026-10-25');
   await other.edit('2026-10-25', `![keep](photos/${keep})`);
   const newer = await photo(other);
   expect(await first.deletePhotos(plan.map(file => file.name), { onlyUnused: true })).toEqual([remove]);
@@ -199,7 +199,7 @@ it('syncs permanent deletion before removing cloud bytes, and an offline device 
   await first.sync();
   expect(calls.indexOf(`upload:/deleted-photos/${name}.json`)).toBeLessThan(calls.indexOf(`remove:/photos/${name}`));
   expect(cloud.files.has(`/photos/${name}`)).toBe(false);
-  await laptop.ensureDay('2026-10-25');
+  await addDay(laptop, '2026-10-25');
   await laptop.edit('2026-10-25', `Offline photo reference: ![photo](photos/${name})`);
   await second.sync(); await first.sync();
   expect(await laptop.local.photo(name)).toBeUndefined();
@@ -252,20 +252,4 @@ it('does not persist a download that finishes after local permanent deletion', a
   expect(await target.local.photo(name)).toBeUndefined();
   await engine.sync();
   expect(cloud.files.has(`/photos/${name}`)).toBe(false);
-});
-
-it('ignores deletion files in legacy plaintext imports, while retaining known local deletions', async () => {
-  const legacy = new MemoryCloud(), source = await device(), target = await device();
-  const keep = await photo(source), deleted = await photo(source);
-  await source.edit(DATE, `![keep](photos/${keep}) ![old](photos/${deleted})`);
-  await new SyncEngine(source, legacy).sync();
-  // Plaintext legacy data must not be able to inject new permanent deletions.
-  await legacy.upload(`/deleted-photos/${keep}.json`, encodePhotoDeletions([keep]));
-  await target.deletePhotos([deleted]);
-  const writes = legacy.uploads;
-  await new SyncEngine(target, legacy).importOnly();
-  expect(await target.local.photo(keep)).toBeDefined();
-  expect(await target.local.photo(deleted)).toBeUndefined();
-  expect(await target.local.photoDeletions()).toEqual(new Set([deleted]));
-  expect(legacy.uploads).toBe(writes);
 });

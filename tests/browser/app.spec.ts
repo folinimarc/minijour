@@ -49,6 +49,24 @@ test('loads and writes offline after the app shell has installed', async ({ page
   await expect(page.locator('.cm-content')).toContainText('Written without a connection.');
 });
 
+test('reports a rejected installation prompt without an unhandled rejection', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await openJournal(page);
+  await page.evaluate(() => {
+    const event = new Event('beforeinstallprompt', { cancelable: true });
+    Object.assign(event, {
+      prompt: () => Promise.reject(new Error('Installation could not start.')),
+      userChoice: Promise.resolve({ outcome: 'dismissed' }),
+    });
+    window.dispatchEvent(event);
+  });
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Install minijour', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Installation could not start');
+  expect(errors).toEqual([]);
+});
+
 test('prepends the new local day once after midnight', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-24T21:59:59Z') });
   await openJournal(page);

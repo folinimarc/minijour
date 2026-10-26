@@ -56,7 +56,7 @@ export class EncryptedFiles implements CloudFiles {
   static async inspect(cloud: VaultStorage, files?: RemoteFile[]): Promise<Header | undefined> {
     files ??= await cloud.list();
     if (!files.some(file => file.path === HEADER)) {
-      if (files.length) throw new Error('The encrypted Dropbox folder has no vault header. Restore its vault.json before syncing.');
+      if (files.length) throw new Error('The encrypted cloud folder has no vault header. Restore its vault.json before syncing.');
       return undefined;
     }
     const bytes = await cloud.download(HEADER);
@@ -73,7 +73,7 @@ export class EncryptedFiles implements CloudFiles {
     const wrappingKey = await passwordKey(password, header.salt);
     let raw: Uint8Array;
     try { raw = await decrypt(wrappingKey, unhex(header.wrappedKey), aad(header.id, `key:${header.salt}`)); }
-    catch { throw new Error('Could not unlock Dropbox. Check your password; damaged encryption metadata can also cause this error.'); }
+    catch { throw new Error('Could not unlock cloud storage. Check your password; damaged encryption metadata can also cause this error.'); }
     try {
       const key = await crypto.subtle.importKey('raw', new Uint8Array(raw), 'AES-GCM', false, ['encrypt', 'decrypt']);
       return new EncryptedFiles(cloud, header, key);
@@ -103,7 +103,7 @@ export class EncryptedFiles implements CloudFiles {
     // retries after a response was lost. The winning header is authoritative.
     await cloud.create(HEADER, encoder.encode(JSON.stringify(header)));
     const winner = await this.inspect(cloud);
-    if (!winner) throw new Error('Dropbox did not save the encryption header. Please try again.');
+    if (!winner) throw new Error('Cloud storage did not save the encryption header. Please try again.');
     if (JSON.stringify(winner) === JSON.stringify(header)) return new EncryptedFiles(cloud, winner, key);
     return this.unlock(cloud, winner, password);
   }

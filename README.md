@@ -50,6 +50,7 @@ No analytics or third-party fonts are included. Cloud tokens stay on your device
 
 - [User guide](docs/user-guide.md): installation, writing, sync, and backups.
 - [Developer guide](docs/development.md): setup, architecture, tests, and a beginner learning path.
+- [Architecture details](docs/architecture.md): save timing, storage, encryption, and sync rules.
 - [Deployment guide](docs/deployment.md): static hosting, GitHub Pages, and cloud provider configuration.
 - [Release guide](docs/releasing.md): versioning, compatibility, and publication.
 - [Changelog](CHANGELOG.md): changes intended for users and deployment operators.
