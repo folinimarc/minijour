@@ -16,7 +16,7 @@ Deleting a date asks for confirmation, then clears its text through `Journal.edi
 
 Sync still fetches and merges all days and photos. Deferring document sync until navigation would require reliable remote indexing and changes to backup and photo-reference checks. Lazy editor creation reduces browser work without changing the storage contract.
 
-The top bar is sticky. On opening, the editor explicitly scrolls its final position into view; delayed photo loads and viewport resizing can repeat that reveal until the first user interaction. Browser scroll restoration is disabled on the journal page. After interaction, incoming sync preserves the person's position.
+The top bar is sticky. On opening, the editor explicitly scrolls its final position into view. A `ResizeObserver` watches journal height, so photo dimensions arriving after the first layout can repeat that reveal before the image loads. Viewport resizing can also repeat it. The first user interaction stops following the opening position. Browser scroll restoration is disabled on the journal page. After interaction, incoming sync preserves the person's position.
 
 The header uses a storage-status button instead of wrapping status text. `ui/storage-status.ts` chooses one status for both that button and the explanation in cloud settings. Device/cloud checkmarks require durable local data and, for cloud, a successful sync with no pending changes. Unsaved local edits use a plain device, local failures a device warning, and locked/offline/unavailable cloud access a cloud warning. The header retains a screen-reader live status, accessible button description, and tooltip; the visible explanation is in settings.
 

@@ -80,31 +80,59 @@ test('shows headings for opened empty dates, preserves undo, and reveals incomin
   await expect(page.locator('.day-heading:visible time')).toHaveText([TODAY, '2026-10-24', '2026-10-23']);
 });
 
-test('keeps the opening cursor visible when a photo finishes loading later', async ({ page }) => {
-  await openJournal(page);
-  await page.keyboard.insertText('An earlier line.\n\n'.repeat(45));
-  await addTestPhoto(page);
-  await page.keyboard.insertText('\nContinue below this photo.');
-  await expect(page.getByRole('status')).toHaveText('Saved on this device only');
-  // Hold only journal photo loads until after the opening scroll has happened.
-  await page.addInitScript(() => {
-    const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!;
-    const pending: (() => void)[] = [];
-    Object.defineProperty(HTMLImageElement.prototype, 'src', { ...src, set(value: string) {
-      if (value.startsWith('blob:')) pending.push(() => src.set!.call(this, value));
-      else src.set!.call(this, value);
-    } });
-    document.addEventListener('test:load-photos', () => { pending.splice(0).forEach(load => load()); });
+for (const scrollAway of [false, true]) {
+  test(scrollAway ? 'preserves deliberate scrolling while photo dimensions and image loading finish'
+    : 'keeps the opening cursor visible when a photo finishes loading later', async ({ page }) => {
+    await openJournal(page);
+    await page.keyboard.insertText('An earlier line.\n\n'.repeat(45));
+    await addTestPhoto(page);
+    await page.keyboard.insertText('\nContinue below this photo.');
+    await expect(page.getByRole('status')).toHaveText('Saved on this device only');
+    // Hold metadata decoding and the actual image separately, so the test does
+    // not depend on their timing relative to CodeMirror's first layout.
+    await page.addInitScript(() => {
+      const decode = window.createImageBitmap.bind(window);
+      const pendingDecodes: (() => void)[] = [];
+      window.createImageBitmap = ((...args: Parameters<typeof decode>) => new Promise<ImageBitmap>((resolve, reject) => {
+        pendingDecodes.push(() => { void decode(...args).then(resolve, reject); });
+        document.documentElement.dataset.pendingPhotoDecode = String(pendingDecodes.length);
+      })) as typeof decode;
+      document.addEventListener('test:decode-photos', () => pendingDecodes.splice(0).forEach(decode => decode()));
+      const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!;
+      const pending: (() => void)[] = [];
+      Object.defineProperty(HTMLImageElement.prototype, 'src', { ...src, set(value: string) {
+        if (value.startsWith('blob:')) pending.push(() => src.set!.call(this, value));
+        else src.set!.call(this, value);
+      } });
+      document.addEventListener('test:load-photos', () => { pending.splice(0).forEach(load => load()); });
+    });
+    await page.reload();
+    const lastLine = page.locator('.cm-content .cm-line').last();
+    await expect(lastLine).toContainText('Continue below this photo.');
+    await expect(lastLine).toBeInViewport({ ratio: 0.99 });
+    await expect(page.locator('html')).toHaveAttribute('data-pending-photo-decode', '1');
+    let readerScroll: number | undefined;
+    if (scrollAway) {
+      const initial = await page.evaluate(() => scrollY);
+      // Stay within CodeMirror's rendered range while moving away from the end.
+      await page.mouse.wheel(0, -200);
+      await expect.poll(() => page.evaluate(() => scrollY)).toBeLessThan(initial - 100);
+      readerScroll = await page.evaluate(() => scrollY);
+    }
+    await page.evaluate(() => document.dispatchEvent(new Event('test:decode-photos')));
+    const photo = page.locator('.photo-preview img');
+    await expect(photo).toHaveCount(1);
+    if (!scrollAway) await expect(lastLine).toBeInViewport({ ratio: 0.99 });
+    // Finish even if the reader moved beyond the browser's lazy-loading range.
+    await photo.evaluate((image: HTMLImageElement) => { image.loading = 'eager'; });
+    await page.evaluate(() => document.dispatchEvent(new Event('test:load-photos')));
+    await expect.poll(() => photo.evaluate((image: HTMLImageElement) => image.naturalHeight)).toBeGreaterThan(0);
+    if (scrollAway) {
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      expect(await page.evaluate(() => scrollY)).toBeCloseTo(readerScroll!, 0);
+    } else await expect(lastLine).toBeInViewport({ ratio: 0.99 });
   });
-  await page.reload();
-  const lastLine = page.locator('.cm-content .cm-line').last();
-  await expect(lastLine).toContainText('Continue below this photo.');
-  await expect(lastLine).toBeInViewport({ ratio: 0.99 });
-  await expect(page.locator('.photo-preview img')).toHaveCount(1);
-  await page.evaluate(() => document.dispatchEvent(new Event('test:load-photos')));
-  await expect.poll(() => page.locator('.photo-preview img').evaluate((image: HTMLImageElement) => image.naturalHeight)).toBeGreaterThan(0);
-  await expect(lastLine).toBeInViewport({ ratio: 0.99 });
-});
+}
 
 test('advances the writing draft at midnight without saving empty dates', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-10-24T21:59:59Z') });

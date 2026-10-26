@@ -4,6 +4,10 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+### Fixed
+
+- Keep the opening cursor visible when photo dimensions arrive after the first editor layout, while preserving deliberate scrolling. Cover delayed decoding and image loading independently in browser tests.
+
 ## 0.3.0 - 2026-10-26
 
 ### Changed

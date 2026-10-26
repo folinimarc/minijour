@@ -163,13 +163,15 @@ async function start(): Promise<void> {
   ui.journal.setAttribute('aria-busy', 'false');
   updateStatus();
 
-  // Follow delayed photo layout and keyboard resize only until the person acts.
+  // Photo dimensions can arrive before the image loads. Follow changes to the
+  // journal's height, and keyboard resize, only until the person acts.
   const stopOpeningScroll = () => view.stopFollowing();
   for (const event of ['pointerdown', 'keydown', 'touchmove', 'wheel']) {
     document.addEventListener(event, stopOpeningScroll, { capture: true, passive: true });
   }
   const revealOpening = () => view.revealOpening();
-  ui.journal.addEventListener('load', revealOpening, true);
+  const openingLayout = new ResizeObserver(revealOpening);
+  openingLayout.observe(ui.journal);
   window.visualViewport?.addEventListener('resize', revealOpening);
 
   const closePhotoMenu = setupPhotoInput(ui, journal, view, notify);
