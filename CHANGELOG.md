@@ -4,6 +4,8 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 
 ## Unreleased
 
+## 0.5.0 - 2026-10-26
+
 ### Changed
 
 - Automatically consolidate cloud text and photo preference snapshots after a replacement uploads successfully. Keep editing history, including cleared entries, and leave photo removal under explicit cleanup.
