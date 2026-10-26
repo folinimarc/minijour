@@ -6,7 +6,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import type { PhotoUrls } from './photos';
 import { photoPreviews, refreshPhotos } from './photo-previews';
-import { editDay, type DayDoc } from '../domain/day';
+import { applyTextEdits, type DayDoc, type TextEdit } from '../domain/day';
 
 const externalChange = Annotation.define<boolean>();
 /** One editor per day, visually joined into one chronological document. */
@@ -55,7 +55,11 @@ export class DayEditor {
             if (update.docChanged && !this.applyingExternal && !update.transactions.every(tx => tx.annotation(externalChange))) {
               // Edit the version actually displayed, even if a remote change is
               // waiting for IME composition to finish. Automerge merges branches.
-              this.displayedDoc = editDay(this.displayedDoc, update.state.doc.toString());
+              const edits: TextEdit[] = [];
+              update.changes.iterChanges((from, to, _fromB, _toB, insert) => {
+                edits.push({ from, to, insert: insert.toString() });
+              });
+              this.displayedDoc = applyTextEdits(this.displayedDoc, edits);
               onEdit(this.displayedDoc);
             }
           }),

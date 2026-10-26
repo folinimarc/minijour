@@ -2,6 +2,7 @@ import * as A from '@automerge/automerge';
 
 export type Day = { text: string };
 export type DayDoc = A.Doc<Day>;
+export type TextEdit = { from: number; to: number; insert: string };
 
 export function localDate(now = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -38,6 +39,17 @@ export function loadDay(bytes: Uint8Array): DayDoc {
 
 export function editDay(doc: DayDoc, text: string): DayDoc {
   return A.change(doc, draft => A.updateText(draft, ['text'], text));
+}
+
+/** Non-overlapping editor edits, ordered by position in the original text. */
+export function applyTextEdits(doc: DayDoc, edits: readonly TextEdit[]): DayDoc {
+  return A.change(doc, draft => {
+    // Work backwards so earlier edits keep their original UTF-16 positions.
+    for (let i = edits.length - 1; i >= 0; i--) {
+      const { from, to, insert } = edits[i];
+      A.splice(draft, ['text'], from, to - from, insert);
+    }
+  });
 }
 
 export function hasContent(day: Day): boolean { return day.text.trim().length > 0; }

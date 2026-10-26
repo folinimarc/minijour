@@ -100,4 +100,4 @@ Automated tests exercise the production build in Chromium, including a mobile vi
 
 Real camera/keyboard behavior, installed-PWA authorization, and live Dropbox accounts still need device testing. Safari/iOS and Firefox are not currently in automated coverage. Installation instructions do not imply every browser has been verified.
 
-Automerge makes replicas converge, but two devices rewriting the same sentence can produce wording you want to tidy up. Checkpoints and deletion records are retained, so remote storage grows. Photo files remain until explicit cleanup. A new device initially downloads available checkpoints and photos.
+Automerge makes replicas converge, but two devices rewriting the same sentence can produce wording you want to tidy up. Redundant text and preference snapshots are consolidated automatically. Editing history and small photo deletion records are retained; photo files remain until explicit cleanup. A new device initially downloads available snapshots and missing photos.

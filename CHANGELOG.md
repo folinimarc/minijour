@@ -7,6 +7,7 @@ Changes for users and deployment operators. Versions follow [Semantic Versioning
 ### Changed
 
 - Automatically consolidate cloud text and photo preference snapshots after a replacement uploads successfully. Keep editing history, including cleared entries, and leave photo removal under explicit cleanup.
+- Forward exact editor insertions and deletions to Automerge instead of comparing the whole day's text after each edit. Keep the existing save and sync timing.
 
 ### Fixed
 
