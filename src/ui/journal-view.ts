@@ -19,7 +19,7 @@ export class JournalView {
 
   constructor(
     private container: HTMLElement, private journal: Journal, private urls: PhotoUrls,
-    private options: { notify: (error: unknown) => void; canFocus: () => boolean },
+    private options: { edited: () => void; notify: (error: unknown) => void; canFocus: () => boolean },
   ) {}
 
   get dates(): string[] {
@@ -149,6 +149,7 @@ export class JournalView {
     const existing = this.editors.get(date);
     if (existing) return existing;
     const editor = new DayEditor(this.sections.get(date)!.content, this.document(date), date, this.urls, next => {
+      this.options.edited();
       this.stopFollowing();
       this.opened.add(date);
       if (!this.journal.days.has(date) && !hasContent(next)) {

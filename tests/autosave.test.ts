@@ -9,9 +9,9 @@ it('saves once after a pause, and does no work when nothing changed', async () =
   let dirty = true;
   const save = vi.fn(async () => { dirty = false; });
   autosave = new Autosave(save, () => dirty, vi.fn());
-  autosave.changed();
+  autosave.edited();
   await vi.advanceTimersByTimeAsync(1000);
-  autosave.changed();
+  autosave.edited();
   await vi.advanceTimersByTimeAsync(1499);
   expect(save).not.toHaveBeenCalled();
   await vi.advanceTimersByTimeAsync(1);
@@ -20,37 +20,35 @@ it('saves once after a pause, and does no work when nothing changed', async () =
   expect(save).toHaveBeenCalledTimes(1);
 });
 
-it('checkpoints continuous typing every ten seconds without redundant idle saves', async () => {
+it('never starts an automatic save during continuous typing, including periodic checkpoints', async () => {
   vi.useFakeTimers();
   let dirty = false;
   const save = vi.fn(async () => { dirty = false; });
   autosave = new Autosave(save, () => dirty, vi.fn());
   for (let step = 0; step < 40; step++) {
-    dirty = true; autosave.changed();
+    dirty = true; autosave.edited();
     await vi.advanceTimersByTimeAsync(500);
   }
-  expect(save).toHaveBeenCalledTimes(2);
-  await vi.advanceTimersByTimeAsync(1500);
-  expect(save).toHaveBeenCalledTimes(2);
+  expect(save).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(999);
+  expect(save).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(save).toHaveBeenCalledTimes(1);
 });
 
-it('skips a periodic checkpoint if a save succeeded in the preceding interval', async () => {
+it('checks the latest edit when typing resumes just before a periodic tick', async () => {
   vi.useFakeTimers();
   let dirty = true;
   const save = vi.fn(async () => { dirty = false; });
   autosave = new Autosave(save, () => dirty, vi.fn());
-  autosave.changed();
-  await vi.advanceTimersByTimeAsync(1500);
-  for (let step = 0; step < 17; step++) {
-    dirty = true; autosave.changed();
-    await vi.advanceTimersByTimeAsync(500);
-  }
+  await vi.advanceTimersByTimeAsync(9999);
+  autosave.edited();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(save).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1498);
+  expect(save).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
   expect(save).toHaveBeenCalledTimes(1);
-  for (let step = 0; step < 20; step++) {
-    dirty = true; autosave.changed();
-    await vi.advanceTimersByTimeAsync(500);
-  }
-  expect(save).toHaveBeenCalledTimes(2);
 });
 
 it('keeps edits during a slow save pending and waits for another pause', async () => {
@@ -62,9 +60,9 @@ it('keeps edits during a slow save pending and waits for another pause', async (
     else dirty = false;
   });
   autosave = new Autosave(save, () => dirty, vi.fn());
-  autosave.changed();
+  autosave.edited();
   await vi.advanceTimersByTimeAsync(1500);
-  autosave.changed();
+  autosave.edited();
   await vi.advanceTimersByTimeAsync(1500);
   expect(save).toHaveBeenCalledTimes(1);
   finish(); await vi.advanceTimersByTimeAsync(0);
@@ -94,9 +92,47 @@ it('retries a failed save at the periodic checkpoint without requiring another e
   const save = vi.fn().mockRejectedValueOnce(error).mockImplementation(async () => { dirty = false; });
   const notify = vi.fn();
   autosave = new Autosave(save, () => dirty, notify);
-  autosave.changed();
+  autosave.edited();
   await vi.advanceTimersByTimeAsync(1500);
   expect(notify).toHaveBeenCalledWith(error);
   await vi.advanceTimersByTimeAsync(8500);
   expect(save).toHaveBeenCalledTimes(2);
+});
+
+it('uses the periodic fallback for idle pending work even without a change notification', async () => {
+  vi.useFakeTimers();
+  let dirty = true;
+  const save = vi.fn(async () => { dirty = false; });
+  autosave = new Autosave(save, () => dirty, vi.fn());
+  await vi.advanceTimersByTimeAsync(10_000);
+  expect(save).toHaveBeenCalledTimes(1);
+});
+
+it('leaves cloud and other background requests pending while typing continues', async () => {
+  vi.useFakeTimers();
+  const save = vi.fn(async () => {});
+  autosave = new Autosave(save, () => true, vi.fn());
+  for (let step = 0; step < 25; step++) {
+    autosave.edited();
+    await vi.advanceTimersByTimeAsync(500);
+    autosave.changed();
+    await vi.advanceTimersByTimeAsync(500);
+  }
+  expect(save).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(save).toHaveBeenCalledTimes(1);
+});
+
+it('does not mistake a clock adjustment for a pause in editing', async () => {
+  vi.useFakeTimers();
+  const save = vi.fn(async () => {});
+  autosave = new Autosave(save, () => true, vi.fn());
+  await vi.advanceTimersByTimeAsync(9999);
+  autosave.edited();
+  vi.setSystemTime(new Date('2030-01-01'));
+  await vi.advanceTimersByTimeAsync(1);
+  expect(save).not.toHaveBeenCalled();
+  expect(autosave.isIdle).toBe(false);
+  await vi.advanceTimersByTimeAsync(1499);
+  expect(save).toHaveBeenCalledTimes(1);
 });

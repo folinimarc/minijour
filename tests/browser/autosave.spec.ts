@@ -52,20 +52,20 @@ test('batches repeated editing into one durable save after a pause', async ({ pa
   await expect(page.locator('.cm-content')).toHaveText('A memory to edi');
 });
 
-test('checkpoints continuous typing even when the idle timer never expires', async ({ page }) => {
+test('keeps continuous typing in memory until the same pause required by the idle timer', async ({ page }) => {
   await watchWrites(page); await openJournal(page); await pause(page);
-  for (let index = 0; index < 12; index++) {
+  for (let index = 0; index < 35; index++) {
     await page.keyboard.insertText('x');
     await page.clock.runFor(1000);
   }
-  await expect.poll(() => writes(page)).toBe(1);
-  expect((await storedText(page)).length).toBeGreaterThanOrEqual(9);
+  expect(await writes(page)).toBe(0);
+  expect(await storedText(page)).toBe('');
   await page.clock.runFor(1500);
-  await expect.poll(() => storedText(page)).toBe('x'.repeat(12));
-  expect(await writes(page)).toBe(2);
+  await expect.poll(() => storedText(page)).toBe('x'.repeat(35));
+  expect(await writes(page)).toBe(1);
 });
 
-test('keeps local checkpoints working during a slow cloud request without queuing another round', async ({ page, context }) => {
+test('requires a pause for later saves and sync rounds while an earlier cloud request is in flight', async ({ page, context }) => {
   test.skip(!process.env.VITE_DROPBOX_APP_KEY, 'Requires a configured provider.');
   const mock = new DropboxMock(); await mock.install(context);
   await watchWrites(page); await openJournal(page); await connect(page); await pause(page);
@@ -87,15 +87,66 @@ test('keeps local checkpoints working during a slow cloud request without queuin
   await page.clock.runFor(1500);
   await expect.poll(() => storedText(page)).toBe('First. More.');
   expect(lists).toBe(1);
-  for (let index = 0; index < 22; index++) {
+  for (let index = 0; index < 35; index++) {
     await page.keyboard.insertText('x'); await page.clock.runFor(1000);
   }
-  await expect.poll(() => writes(page)).toBeGreaterThanOrEqual(3);
+  expect(await writes(page)).toBe(2);
+  expect(await storedText(page)).toBe('First. More.');
   expect(lists).toBe(1);
   release();
   await expect(page.locator('#sync-button')).toHaveText('Sync now');
   expect(lists).toBe(1);
   await page.clock.runFor(1500);
   await expect.poll(() => lists).toBeGreaterThan(1);
+  await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
+});
+
+test('defers periodic cloud polling while typing even in a whitespace-only draft', async ({ page, context }) => {
+  test.skip(!process.env.VITE_DROPBOX_APP_KEY, 'Requires a configured provider.');
+  const mock = new DropboxMock(); await mock.install(context);
+  await watchWrites(page); await openJournal(page); await connect(page); await pause(page);
+  const before = mock.apiCalls;
+  for (let index = 0; index < 35; index++) {
+    await page.keyboard.insertText(' '); await page.clock.runFor(1000);
+  }
+  expect(mock.apiCalls).toBe(before);
+  expect(await writes(page)).toBe(0);
+  await page.clock.runFor(1500);
+  await expect.poll(() => mock.apiCalls).toBeGreaterThan(before);
+  await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
+  expect(await writes(page)).toBe(0);
+});
+
+test('does not start cloud sync if typing resumes while a local batch is being committed', async ({ page, context }) => {
+  test.skip(!process.env.VITE_DROPBOX_APP_KEY, 'Requires a configured provider.');
+  const mock = new DropboxMock(); await mock.install(context);
+  await watchWrites(page); await openJournal(page); await connect(page); await pause(page);
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    let resumed = false;
+    IDBObjectStore.prototype.put = function (...args: Parameters<typeof put>) {
+      const request = put.apply(this, args);
+      if (this.name === 'days' && !resumed) {
+        resumed = true;
+        // Resume editing after the snapshot was written, before its transaction
+        // completes. A real browser edit fires input and CodeMirror updates.
+        queueMicrotask(() => document.execCommand('insertText', false, ' More.'));
+      }
+      return request;
+    };
+  });
+  const before = mock.apiCalls;
+  await page.keyboard.insertText('First.');
+  await page.clock.runFor(1500);
+  await expect(page.locator('.cm-content')).toHaveText('First. More.');
+  await expect.poll(() => storedText(page)).toBe('First.');
+  await expect(page.getByRole('status')).toHaveText('Changes waiting to save…');
+  expect(mock.apiCalls).toBe(before);
+  await page.clock.runFor(1499);
+  expect(await writes(page)).toBe(1);
+  expect(mock.apiCalls).toBe(before);
+  await page.clock.runFor(1);
+  await expect.poll(() => storedText(page)).toBe('First. More.');
+  await expect.poll(() => mock.apiCalls).toBeGreaterThan(before);
   await expect(page.getByRole('status')).toContainText('Saved to Dropbox');
 });

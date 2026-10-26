@@ -1,10 +1,11 @@
-/** Batch edits after a pause, with a checkpoint during continuous typing. */
+/** Both automatic timers require a pause; the interval only retries missed saves. */
 export class Autosave {
   private idle?: ReturnType<typeof setTimeout>;
   private interval: ReturnType<typeof setInterval>;
   private running = false;
   private revision = 0;
-  private lastSave = Date.now();
+  private lastSave = performance.now();
+  private lastEdit = -Infinity;
 
   constructor(
     private save: () => Promise<void>,
@@ -12,7 +13,7 @@ export class Autosave {
     private onError: (error: unknown) => void,
   ) {
     this.interval = setInterval(() => {
-      if (Date.now() - this.lastSave >= 10_000) void this.checkpoint();
+      if (performance.now() - this.lastSave >= 10_000) void this.checkpoint();
     }, 10_000);
   }
 
@@ -21,8 +22,15 @@ export class Autosave {
     this.schedule();
   }
 
+  edited(): void {
+    this.lastEdit = performance.now();
+    this.changed();
+  }
+
+  get isIdle(): boolean { return performance.now() - this.lastEdit >= 1500; }
+
   /** Explicit saves count too, so the fallback does not repeat recent work. */
-  saved(): void { this.lastSave = Date.now(); }
+  saved(): void { this.lastSave = performance.now(); }
 
   private schedule(): void {
     clearTimeout(this.idle);
@@ -33,7 +41,7 @@ export class Autosave {
   }
 
   private async checkpoint(): Promise<void> {
-    if (this.running || !this.hasChanges()) return;
+    if (this.running || !this.isIdle || !this.hasChanges()) return;
     this.running = true;
     const revision = this.revision;
     try {

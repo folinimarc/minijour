@@ -13,7 +13,7 @@ export async function setupCloudSettings(
     busy: () => boolean; activity: (value: boolean) => void;
     change: (engine?: SyncEngine, providerName?: string) => void;
     connection: (connected: boolean) => void;
-    sync: () => Promise<void>; notify: (error: unknown) => void;
+    sync: () => Promise<void>; requestSync: () => void; notify: (error: unknown) => void;
   },
 ): Promise<void> {
   const local = journal.local;
@@ -137,7 +137,7 @@ export async function setupCloudSettings(
   };
   ui.checkCloud.onclick = () => { void check().then(options.sync); };
   window.addEventListener('online', () => {
-    if (session && !inspected && !working) void check().then(options.sync);
+    if (session && !inspected && !working) void check().then(options.requestSync);
   });
   show(); await check();
 }

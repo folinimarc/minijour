@@ -40,7 +40,7 @@ src/
   storage/
     local.ts          IndexedDB access, including safe saves from multiple tabs
     persistence.ts    Best-effort browser storage protection after a save
-    autosave.ts       Idle save timer and periodic checkpoint for pending edits
+    autosave.ts       Idle save timer and periodic retry with the same idle rule
     backup.ts         Portable ZIP export and text history restore
     photo-cleanup.ts  Candidate photo IDs and sizes for explicit review
   sync/
@@ -100,7 +100,18 @@ The top bar is sticky. On opening, the editor explicitly scrolls its final posit
 
 Per-day documents keep transfers smaller and make a date heading unique without trying to merge independently inserted headings in freeform text. Devices construct the same immutable creation change for a given date, then switch to fresh actor IDs for actual edits. This shared starting point matters: independently creating two nested text objects would cause property conflicts rather than collaborative text edits. The fixed creation actor must never be used for subsequent typing.
 
-On each editor update, `Automerge.updateText()` records text operations and `Journal.stage()` merges the document into memory. The keystroke path does not serialize or reload the full day, write IndexedDB, or broadcast to other tabs. `storage/autosave.ts` starts a save after 1.5 seconds without editing. Independently, every 10 seconds it checks for pending work and saves if no batch succeeded in the previous 10 seconds. It skips clean journals and never overlaps local batches. The periodic check can skip one tick after a recent idle save, so continuous typing may leave up to about 20 seconds of unsaved changes; browser suspension or throttling can delay timers further.
+On each editor update, `Automerge.updateText()` records text operations and `Journal.stage()` merges the document into memory. The keystroke path does not serialize or reload the full day, write IndexedDB, or broadcast to other tabs. `storage/autosave.ts` uses these rules:
+
+| Trigger | Rule |
+| --- | --- |
+| Editing pauses | Start a batch after at least 1.5 seconds without a local text change, if work is pending and no local batch is running. This includes deletions, undo, photo-link insertion, and whitespace-only draft edits. |
+| 10-second fallback | Retry pending work only if the same 1.5-second pause holds and no successful batch or local write occurred in the preceding 10 seconds. The fallback never overrides active typing. |
+| Startup, return online/visible, 30-second cloud polling | Request an automatic batch; respect the same editing pause. Cloud checks and unlocking account metadata are separate from journal saving. |
+| Typing resumes during a local save | Let the captured batch finish. Newer edits remain pending. Recheck the pause and pending local edits before starting its cloud phase. |
+| Typing resumes during cloud sync | Let the existing request finish; do not cancel it or queue an immediate extra round. New changes keep the pending status and wait for another idle batch. |
+| Explicit actions | Sync now, authorization redirects, entry deletion, photo cleanup, and app updates may flush immediately. Backgrounding or page exit also attempts an immediate save. Choosing a photo stores its image immediately; its Markdown link follows autosave. |
+
+Only edits reset the typing clock; remote changes and polling merely request work. Elapsed times use `performance.now()` so changing the device clock does not bypass the pause. Clean journals are skipped and local batches never overlap. Continuous typing can remain unsaved indefinitely until a pause or an explicit action; there is no fixed maximum crash-loss window. Browser suspension or throttling can also delay timers.
 
 `Journal.flush()` snapshots only changed dates. Per-date revisions prevent a completed save from marking newer typing as durable. Failed dates remain pending for retry. Explicit sync, cloud authorization, photo cleanup, and app updates flush pending changes immediately. Backup export includes the current in-memory entries. Backgrounding and page exit attempt an immediate save, but cannot guarantee completion if the browser closes. The status distinguishes edits waiting to save from durable local data. This batching deliberately accepts losing recent unsaved typing in a crash.
 
@@ -143,7 +154,7 @@ A writer ID is unique to each running app instance. It owns one checkpoint per d
 
 The engine lists checkpoints, downloads new revisions, merges them locally, transfers photos, and uploads local changes. Repeated requests are safe because the library recognizes changes it has already seen. Concurrent text merging belongs to Automerge; the engine coordinates file transfer. Remote files are validated before use.
 
-Automatic sync follows a local save batch. Cloud requests run independently so a slow upload cannot block later local checkpoints. Edits during an upload mark the cloud copy as pending; they do not ask the engine for an immediate extra round. After the request finishes, remaining changes wait for another 1.5-second pause or periodic checkpoint. Successful uploads only clear the pending status if no changes arrived during the request. Opening performs an initial sync; returning online/visible and the 30-second remote polling interval request an idle batch too. **Uploads cannot be guaranteed while the app is closed or suspended.** Check the saved status before switching devices if you need the latest edit immediately.
+Automatic sync follows a local save batch and rechecks the editing pause before starting cloud work. Cloud requests run independently so a slow upload cannot block later local saves once typing pauses. An already-started request, including merging incoming documents, is allowed to finish if typing resumes. Edits during an upload mark the cloud copy as pending; they do not ask the engine for an immediate extra round. Remaining changes wait for another idle batch; the periodic fallback requires the same pause. Successful uploads only clear the pending status if no changes arrived during the request. Startup, returning online/visible, and the 30-second remote polling interval request an idle batch. **Uploads cannot be guaranteed while the app is closed or suspended.** Check the saved status before switching devices if you need the latest edit immediately.
 
 We retain checkpoints and small permanent photo deletion records. Photo files are retained until explicit user-confirmed cleanup. Storage grows with editing history and app sessions; old snapshots aren't automatically deleted. A fresh device initially downloads the available checkpoints and photos; later polls cache unchanged checkpoint revisions in memory. These are deliberate simplicity tradeoffs, and the first areas to revisit for very large journals.
 

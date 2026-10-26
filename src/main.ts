@@ -54,7 +54,7 @@ async function start(): Promise<void> {
   const afterSave = protectStorage(local);
   const bannerConnection = await setupStorageBanner(ui, local, providers.length > 0, notify);
   const view = new JournalView(ui.journal, journal, urls, {
-    notify, canFocus: () => !ui.dialog.open && !ui.dateSidebar.open,
+    edited: () => autosave.edited(), notify, canFocus: () => !ui.dialog.open && !ui.dateSidebar.open,
   });
   const editors = view.editors;
   setupDateNavigation(ui, view, notify);
@@ -118,8 +118,11 @@ async function start(): Promise<void> {
   }
 
   // Cloud requests run independently: slow uploads must not block local saves.
-  async function saveBatch(): Promise<void> {
+  async function saveBatch(force = false): Promise<void> {
     await journal.flush();
+    // Typing can resume while the local write is awaiting IndexedDB. Do not
+    // start its automatic cloud phase until that newer typing has paused too.
+    if (!force && (!autosave.isIdle || journal.hasUnsavedChanges)) return;
     if (dirty && !syncing) void syncCloud().catch(notify);
   }
   const autosave = new Autosave(saveBatch,
@@ -257,7 +260,7 @@ async function start(): Promise<void> {
       void openToday(false).then(scheduleSync).catch(notify);
     } else {
       closePhotoMenu();
-      void saveBatch().catch(notify);
+      void saveBatch(true).catch(notify);
     }
   });
   window.addEventListener('online', scheduleSync);
@@ -265,7 +268,7 @@ async function start(): Promise<void> {
   window.addEventListener('beforeunload', event => {
     if (journal.pending || journal.saveError) { event.preventDefault(); event.returnValue = ''; }
   });
-  window.addEventListener('pagehide', () => { void saveBatch().catch(notify); });
+  window.addEventListener('pagehide', () => { void saveBatch(true).catch(notify); });
   setInterval(() => { if (document.visibilityState === 'visible') scheduleSync(); }, 30_000);
 
   // Updates wait for a reload: replacing an open editor while typing is unsafe.
@@ -303,11 +306,11 @@ async function start(): Promise<void> {
       cloudConnected = value; bannerConnection(value); updateStatus();
       view.revealOpening();
     },
-    sync, notify,
+    sync, requestSync: scheduleSync, notify,
   });
   if (justConnected) ui.settingsButton.click();
 
-  void sync().catch(notify);
+  scheduleSync();
 }
 
 void start().catch(error => {
